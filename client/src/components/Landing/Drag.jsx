@@ -4,7 +4,6 @@ import { motion, useSpring, useMotionValue } from "framer-motion";
 import { useEffect, useRef } from "react";
 
 export default function PricingPlans() {
-
   const ballRef = useRef(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -26,13 +25,19 @@ export default function PricingPlans() {
   }, [x, y]);
 
   return (
-    <section >
-
-      {/* Floating Ball Animation */}
+    <section>
+      {/* Floating Ball Animation (hidden on small screens) */}
       <motion.div
         ref={ballRef}
-        style={{ width: 80, height: 80, backgroundColor: "#ff0088", borderRadius: "50%", x: springX, y: springY }}
-        className="fixed top-0 left-0 z-50 opacity-10 pointer-events-none blur-3xl mix-blend-multiply"
+        style={{
+          width: 80,
+          height: 80,
+          backgroundColor: "#ff0088",
+          borderRadius: "50%",
+          x: springX,
+          y: springY,
+        }}
+        className="hidden md:block fixed top-0 left-0 z-50 opacity-10 pointer-events-none blur-3xl mix-blend-multiply"
       />
     </section>
   );
