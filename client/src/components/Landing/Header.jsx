@@ -1,13 +1,25 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 export default function Header() {
   const [isAuth, setIsAuth] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const authFlag = localStorage.getItem("auth");
     setIsAuth(authFlag === "true");
   }, []);
+
+  const handleLogout = () => {
+    // Remove authentication flag from localStorage
+    localStorage.removeItem("auth");
+    
+    // Update authentication state
+    setIsAuth(false);
+
+    // Explicitly navigate to the unsigned home page
+    navigate("/");
+  };
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -27,12 +39,12 @@ export default function Header() {
           </a>
 
           {isAuth ? (
-            <Link
-              to="/dashboard"
+            <button
+              onClick={handleLogout}
               className="px-4 py-1 text-lg border border-blue-900 rounded-full hover:bg-blue-50"
             >
-              Dashboard
-            </Link>
+              Logout
+            </button>
           ) : (
             <Link
               to="/login"
