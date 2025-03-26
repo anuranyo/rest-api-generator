@@ -36,11 +36,12 @@ export default function Hero() {
         </p>
 
         <a
-          href="#generate"
+          href="/login"
           className="inline-block bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition"
         >
           Generate API Now
         </a>
+
       </div>
     </section>
   );
