@@ -31,19 +31,13 @@ export interface Relationship {
 
 interface DiagramState {
   tables: Table[];
-  relationships: {
-    id: string;
-    sourceTableId: string;
-    sourceColumnId: string;
-    targetTableId: string;
-    targetColumnId: string;
-  }[];
-  addTable: (name: string, position: { x: number; y: number }) => void;
+  relationships: Relationship[]; // Updated to use the Relationship interface
+  addTable: (name: string, position: { x: number; y: number }, id?: string) => void; // add optional id for table
   removeTable: (tableId: string) => void;
   addColumn: (tableId: string, name: string, type: ColumnType) => void;
   updateColumn: (tableId: string, columnId: string, updates: Partial<Column>) => void;
   removeColumn: (tableId: string, columnId: string) => void;
-  addRelationship: (relationship: Omit<Relationship, 'id'>) => void;
+  addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => void; // Make id optional for addRelationship and accept in payload
   removeRelationship: (relationshipId: string) => void;
   updateTablePosition: (tableId: string, position: { x: number; y: number }) => void;
   updateTableName: (tableId: string, newName: string) => void;
@@ -58,7 +52,7 @@ export const useStore = create<DiagramState>((set) => ({
   tables: [],
   relationships: [],
 
-  addTable: (name, position, id?: string) => {
+  addTable: (name, position, id) => { // Accept optional id
     if (!name.trim()) {
       console.error('Table name cannot be empty.');
       return;
@@ -133,9 +127,9 @@ export const useStore = create<DiagramState>((set) => ({
     }
 
     set((state) => ({
-      tables: state.tables.map((table) => 
-        table.id === tableId 
-          ? { ...table, name: newName.trim() } 
+      tables: state.tables.map((table) =>
+        table.id === tableId
+          ? { ...table, name: newName.trim() }
           : table
       ),
     }));
@@ -178,13 +172,13 @@ export const useStore = create<DiagramState>((set) => ({
     }));
   },
 
-  addRelationship: (relationship: Omit<Relationship, 'id'>) => {
+  addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => { // Accept optional id in payload
     set((state) => ({
       relationships: [
-        ...state.relationships, 
-        { 
-          ...relationship, 
-          id: generateUUID() 
+        ...state.relationships,
+        {
+          ...relationship,
+          id: relationship.id || generateUUID() // Use provided ID or generate a new one
         }
       ]
     }));

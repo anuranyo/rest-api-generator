@@ -6,8 +6,8 @@ interface RelationshipModalProps {
   targetTables: Table[];
   onClose: () => void;
   onCreateRelationship: (
-    relationshipType: string, 
-    sourceColumn: string, 
+    relationshipType: string,
+    sourceColumn: string,
     targetColumn: string
   ) => void;
 }
@@ -32,10 +32,10 @@ export function RelationshipModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl w-96">
         <h2 className="text-xl font-bold mb-4">Create Relationship</h2>
-        
+
         <div className="mb-4">
           <label className="block mb-2">Relationship Type</label>
-          <select 
+          <select
             value={relationshipType}
             onChange={(e) => setRelationshipType(e.target.value)}
             className="w-full border rounded p-2"
@@ -48,7 +48,7 @@ export function RelationshipModal({
 
         <div className="mb-4">
           <label className="block mb-2">Source Column</label>
-          <select 
+          <select
             value={sourceColumn}
             onChange={(e) => setSourceColumn(e.target.value)}
             className="w-full border rounded p-2"
@@ -64,7 +64,7 @@ export function RelationshipModal({
 
         <div className="mb-4">
           <label className="block mb-2">Target Column</label>
-          <select 
+          <select
             value={targetColumn}
             onChange={(e) => setTargetColumn(e.target.value)}
             className="w-full border rounded p-2"
@@ -79,13 +79,13 @@ export function RelationshipModal({
         </div>
 
         <div className="flex justify-end space-x-2">
-          <button 
+          <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
           >
             Cancel
           </button>
-          <button 
+          <button
             onClick={handleSubmit}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             disabled={!sourceColumn || !targetColumn}

@@ -5,7 +5,7 @@ import ReactFlow, {
   Background,
   useNodesState,
   useEdgesState,
-  MarkerType,
+  addEdge,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -14,73 +14,13 @@ import { v4 as uuidv4 } from "uuid";
 import { TableNode } from "../nodes/TableNode";
 import { RelationshipModal } from "../RelationshipModal";
 
-// Custom Marker Component with Improved Rendering
-const CustomMarker = React.forwardRef(({ type, color = '#94a3b8' }, ref) => {
-  switch(type) {
-    case 'one-to-one':
-      return (
-        <marker 
-          ref={ref}
-          id={`${type}-marker`}
-          markerWidth="10" 
-          markerHeight="10" 
-          refX="5" 
-          refY="5"
-          orient="auto"
-        >
-          <line x1="0" y1="5" x2="10" y2="5" stroke={color} strokeWidth="2" />
-        </marker>
-      );
-    case 'one-to-many':
-      return (
-        <marker 
-          ref={ref}
-          id={`${type}-marker`}
-          markerWidth="10" 
-          markerHeight="10" 
-          refX="5" 
-          refY="5"
-          orient="auto"
-        >
-          <path 
-            d="M0,0 L10,5 L0,10" 
-            stroke={color} 
-            fill="none" 
-            strokeWidth="2" 
-          />
-        </marker>
-      );
-    case 'many-to-many':
-      return (
-        <marker 
-          ref={ref}
-          id={`${type}-marker`}
-          markerWidth="15" 
-          markerHeight="10" 
-          refX="7" 
-          refY="5"
-          orient="auto"
-        >
-          <path 
-            d="M0,5 L7,0 L14,5 L7,10 Z" 
-            stroke={color} 
-            fill="none" 
-            strokeWidth="2" 
-          />
-        </marker>
-      );
-    default:
-      return null;
-  }
-});
-
 const nodeTypes = { table: TableNode };
 
 export default function DBSchema() {
   const [isRelationshipModalOpen, setIsRelationshipModalOpen] = useState(false);
-  const [pendingConnection, setPendingConnection] = useState({ 
-    source: null, 
-    target: null 
+  const [pendingConnection, setPendingConnection] = useState({
+    source: null,
+    target: null
   });
 
   const tables = useStore((state) => state.tables);
@@ -107,16 +47,14 @@ export default function DBSchema() {
         id: rel.id,
         source: rel.sourceTableId,
         target: rel.targetTableId,
-        type: 'step',
-        animated: true,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
+        type: 'default',
+        animated: false,
+        markerEnd: rel.type === 'one-to-one' ? undefined : {
+          type: 'arrowclosed',
           color: '#94a3b8',
-          width: 20,
-          height: 20,
         },
-        label: rel.type, // Add this to help debug
-        style: { 
+        label: rel.type,
+        style: {
           stroke: "#94a3b8",
           strokeWidth: 2,
         },
@@ -160,7 +98,7 @@ export default function DBSchema() {
           targetColumnId: targetColumn,
           type: relationshipType
         });
-        
+
         setIsRelationshipModalOpen(false);
         setPendingConnection({ source: null, target: null });
       }
@@ -171,12 +109,12 @@ export default function DBSchema() {
   const handleAddTable = () => {
     const name = prompt("Enter table name:");
     if (!name) return;
-    
+
     const position = {
       x: Math.floor(Math.random() * 500 + 100),
       y: Math.floor(Math.random() * 400 + 100),
     };
-    
+
     const newTableId = uuidv4();
     addTable(name.trim(), position, newTableId);
   };
@@ -192,6 +130,34 @@ export default function DBSchema() {
         fitView
         nodeTypes={nodeTypes}
       >
+        <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+          <defs>
+            <marker
+              id="one-to-many-marker"
+              markerWidth="20"
+              markerHeight="20"
+              refX="5"
+              refY="10"
+              orient="auto"
+            >
+              <path d="M10,10 L0,5" stroke="#94a3b8" strokeWidth="2" fill="none" />
+              <path d="M10,10 L0,15" stroke="#94a3b8" strokeWidth="2" fill="none" />
+              <path d="M10,10 L5,10" stroke="#94a3b8" strokeWidth="2" fill="none" />
+            </marker>
+            <marker
+              id="many-to-many-marker"
+              markerWidth="20"
+              markerHeight="20"
+              refX="5"
+              refY="10"
+              orient="auto"
+            >
+              <path d="M10,10 L0,5" stroke="#94a3b8" strokeWidth="2" fill="none" />
+              <path d="M10,10 L0,15" stroke="#94a3b8" strokeWidth="2" fill="none" />
+              <path d="M10,10 L5,10" stroke="#94a3b8" strokeWidth="2" fill="none" />
+            </marker>
+          </defs>
+        </svg>
         <Background gap={16} color="#f3f4f6" />
         <MiniMap zoomable pannable />
         <Controls position="top-right" />
