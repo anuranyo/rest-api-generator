@@ -45,9 +45,71 @@ export function TableNode({ data }) {
     removeColumn(data.id, columnId);
   };
 
+  // Create handles on all sides
+  const handleStyle = { 
+    width: 8, 
+    height: 8, 
+    backgroundColor: '#778899'
+  };
+
   return (
     <div className="bg-white border rounded shadow p-3 w-[240px]">
-      <Handle type="target" position={Position.Left} />
+      {/* Top handles */}
+      <Handle 
+        type="source" 
+        position={Position.Top} 
+        id={`${data.id}-top-source`} 
+        style={{...handleStyle, left: '25%'}} 
+      />
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        id={`${data.id}-top-target`} 
+        style={{...handleStyle, left: '75%'}}
+      />
+      
+      {/* Left handles */}
+      <Handle 
+        type="source" 
+        position={Position.Left} 
+        id={`${data.id}-left-source`}
+        style={{...handleStyle, top: '25%'}}
+      />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        id={`${data.id}-left-target`}
+        style={{...handleStyle, top: '75%'}}
+      />
+      
+      {/* Right handles */}
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        id={`${data.id}-right-source`}
+        style={{...handleStyle, top: '25%'}}
+      />
+      <Handle 
+        type="target" 
+        position={Position.Right} 
+        id={`${data.id}-right-target`}
+        style={{...handleStyle, top: '75%'}}
+      />
+      
+      {/* Bottom handles */}
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        id={`${data.id}-bottom-source`}
+        style={{...handleStyle, left: '25%'}}
+      />
+      <Handle 
+        type="target" 
+        position={Position.Bottom} 
+        id={`${data.id}-bottom-target`}
+        style={{...handleStyle, left: '75%'}}
+      />
+
       <div className="flex justify-between items-center mb-2">
         {isEditingTableName ? (
           <div className="flex items-center">
@@ -107,7 +169,6 @@ export function TableNode({ data }) {
           />
         ))}
       </div>
-      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

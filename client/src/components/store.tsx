@@ -26,21 +26,28 @@ export interface Relationship {
   sourceColumnId: string;
   targetTableId: string;
   targetColumnId: string;
-  type: 'one-to-many' | 'one-to-one' | 'many-to-many';
+  // New properties for enhanced relationships
+  sourceHandleId?: string;
+  targetHandleId?: string;
+  sourceCardinality?: 'one' | 'many';
+  targetCardinality?: 'one' | 'many';
+  type: 'one-to-many' | 'one-to-one' | 'many-to-many' | 'many-to-one';
 }
 
 interface DiagramState {
   tables: Table[];
-  relationships: Relationship[]; // Updated to use the Relationship interface
-  addTable: (name: string, position: { x: number; y: number }, id?: string) => void; // add optional id for table
+  relationships: Relationship[];
+  addTable: (name: string, position: { x: number; y: number }, id?: string) => void;
   removeTable: (tableId: string) => void;
   addColumn: (tableId: string, name: string, type: ColumnType) => void;
   updateColumn: (tableId: string, columnId: string, updates: Partial<Column>) => void;
   removeColumn: (tableId: string, columnId: string) => void;
-  addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => void; // Make id optional for addRelationship and accept in payload
+  addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => void;
   removeRelationship: (relationshipId: string) => void;
   updateTablePosition: (tableId: string, position: { x: number; y: number }) => void;
   updateTableName: (tableId: string, newName: string) => void;
+  updateRelationship: (relationshipId: string, updates: Partial<Relationship>) => void;
+  deleteRelationship: (relationshipId: string) => void;
 }
 
 // Helper function to generate UUIDs
@@ -48,13 +55,19 @@ const generateUUID = () => {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 };
 
-export const useStore = create<DiagramState>((set) => ({
+export const useStore = create<DiagramState>((set, get) => ({ // Изменено: добавлен get в аргументы create
   tables: [],
   relationships: [],
 
-  addTable: (name, position, id) => { // Accept optional id
+  addTable: (name, position, id) => {
     if (!name.trim()) {
       console.error('Table name cannot be empty.');
+      return;
+    }
+
+    const existingTable = get().tables.find((table) => table.name.toLowerCase() === name.trim().toLowerCase()); // Используем get() для доступа к текущему состоянию
+    if (existingTable) {
+      alert('Table with this name already exists.');
       return;
     }
 
@@ -62,7 +75,7 @@ export const useStore = create<DiagramState>((set) => ({
       tables: [
         ...state.tables,
         {
-          id: id || generateUUID(), // Use provided ID or generate a new one
+          id: id || generateUUID(),
           name,
           columns: [
             {
@@ -172,15 +185,23 @@ export const useStore = create<DiagramState>((set) => ({
     }));
   },
 
-  addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => { // Accept optional id in payload
+  addRelationship: (relationship) => {
     set((state) => ({
       relationships: [
         ...state.relationships,
         {
-          ...relationship,
-          id: relationship.id || generateUUID() // Use provided ID or generate a new one
-        }
-      ]
+          id: relationship.id || generateUUID(),
+          sourceTableId: relationship.sourceTableId,
+          sourceColumnId: relationship.sourceColumnId,
+          targetTableId: relationship.targetTableId,
+          targetColumnId: relationship.targetColumnId,
+          sourceHandleId: relationship.sourceHandleId,
+          targetHandleId: relationship.targetHandleId,
+          sourceCardinality: relationship.sourceCardinality,
+          targetCardinality: relationship.targetCardinality,
+          type: relationship.type,
+        },
+      ],
     }));
   },
 
@@ -195,6 +216,20 @@ export const useStore = create<DiagramState>((set) => ({
       tables: state.tables.map((table) =>
         table.id === tableId ? { ...table, position } : table
       ),
+    }));
+  },
+
+  updateRelationship: (relationshipId, updates) => {
+    set((state) => ({
+      relationships: state.relationships.map((rel) =>
+        rel.id === relationshipId ? { ...rel, ...updates } : rel
+      ),
+    }));
+  },
+
+  deleteRelationship: (relationshipId) => {
+    set((state) => ({
+      relationships: state.relationships.filter((rel) => rel.id !== relationshipId),
     }));
   },
 }));

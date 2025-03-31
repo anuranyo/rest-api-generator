@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import Header from "../Landing/Header";
-import CreateProject from "../Form/CreateProject";
+import CreateProject from "../Page/CreateProject";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState([]);
