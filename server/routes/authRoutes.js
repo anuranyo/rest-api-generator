@@ -280,6 +280,6 @@ router.get('/me', async (req, res) => {
       console.error('Помилка отримання даних користувача:', error);
       res.status(500).json({ message: 'Помилка сервера' });
     }
-  });
+});
   
   module.exports = router;

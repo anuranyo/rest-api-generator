@@ -15,6 +15,7 @@ const SchemaFileSchema = new Schema({
         type: String,
         required: true
     },
+    structure: mongoose.Schema.Types.Mixed,
     uploadedAt: {
         type: Date,
         default: Date.now

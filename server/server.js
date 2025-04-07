@@ -2,14 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-
-dotenv.config();
-
 const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const schemaRoutes = require('./routes/schemaRoutes');
 const generatorRoutes = require('./routes/generatorRoutes');
 
+dotenv.config();
 const app = express();
 
 app.use(cors());
@@ -17,7 +15,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 //app.use('/api/projects', projectRoutes);
-//app.use('/api/schemas', schemaRoutes);
+app.use('/api/schemas', schemaRoutes);
 //app.use('/api/generator', generatorRoutes);
 
 app.get('/', (req, res) =>{
