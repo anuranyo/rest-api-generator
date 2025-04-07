@@ -55,7 +55,7 @@ router.post(
 /**
  * @route   GET /api/schemas
  * @desc    Отримання списку схем JSON
- * @access  Public
+ * @access  Private
  */
 
 router.get('/', auth, schemaController.getSchemas);
@@ -63,7 +63,7 @@ router.get('/', auth, schemaController.getSchemas);
 /**
  * @route   GET /api/schemas
  * @desc    Отримання конкретної схеми JSON
- * @access  Public
+ * @access  Private
  */
 
 router.get('/:id', auth, schemaController.getSchemaById);

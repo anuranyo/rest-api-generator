@@ -3,7 +3,6 @@ const path = require('path');
 const SchemaFile = require('../models/SchemaFile');
 const schemaAnalyzer = require('../services/schemaAnalyzer');
 const { validationResult } = require('express-validator');
-const { ResultWithContextImpl } = require('express-validator/lib/chain');
 
 /**
  * Завантаження JSON файлу зі схемою

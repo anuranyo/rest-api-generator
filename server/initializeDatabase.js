@@ -6,6 +6,7 @@ const SchemaFile = require('./models/SchemaFile');
 const ApiInstance = require('./models/ApiInstance');
 const MockData = require('./models/MockData');
 const Export = require('./models/Export');
+const Project = require('./models/Project')
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ const initializeDatabase = async () => {
         await ApiInstance.init();
         await MockData.init();
         await Export.init();
+        await Project.init();
         console.log('Empty database structure for viyarSchedule created successfully!');
 
         await mongoose.disconnect();
