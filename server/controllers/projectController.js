@@ -1,4 +1,3 @@
-const { decrypt } = require('dotenv');
 const Project = require('../models/Project');
 const SchemaFile = require('../models/SchemaFile');
 const { validationResult } = require('express-validator');
@@ -263,7 +262,7 @@ const addProjectEndpoint = async (req, res) => {
     }
   };
   
-  /**
+/**
  * Додавання запису про експорт до проекту
  * @route POST /api/projects/:id/exports
  * @access Private
