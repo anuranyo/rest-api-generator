@@ -1,26 +1,28 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import ReactFlow, {
   MiniMap,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
-  Handle, // Import Handle
-  Position, // Import Position
+  Handle,
+  Position,
+  ReactFlowProvider,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { useStore } from "../store"; // Удален импорт Relationship
+import { useStore } from "../store";
 import { v4 as uuidv4 } from "uuid";
 import { TableNode } from "../nodes/TableNode";
 import { RelationshipModal } from "../RelationshipModal";
 import { CreateTableModel } from "../Form/CreateTableModel";
-import { EditRelationshipModal } from '../Form/EditRelationshipModal'; // Import EditRelationshipModal
-import { motion, AnimatePresence } from 'framer-motion'; // Import framer-motion for animations
+import { EditRelationshipModal } from '../Form/EditRelationshipModal';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const nodeTypes = { table: TableNode };
 
-export default function DBSchema() {
+// Inner component that uses React Flow hooks
+function DBSchemaFlow() {
   const [isRelationshipModalOpen, setIsRelationshipModalOpen] = useState(false);
   const [pendingConnection, setPendingConnection] = useState({
     source: null,
@@ -34,15 +36,20 @@ export default function DBSchema() {
   const [tableNameError, setTableNameError] = useState(null);
 
   // State for selected relationship to edit
-  const [selectedRelationship, setSelectedRelationship] = useState(null); // Тип убран
+  const [selectedRelationship, setSelectedRelationship] = useState(null);
+  
+  // Reference to the reactflow viewport
+  const reactFlowWrapper = useRef(null);
 
   const tables = useStore((state) => state.tables);
   const addTable = useStore((state) => state.addTable);
   const addRelationship = useStore((state) => state.addRelationship);
   const edgesFromStore = useStore((state) => state.relationships);
-  const updateRelationship = useStore((s) => s.updateRelationship); // Get the updateRelationship function from the store
+  const updateRelationship = useStore((s) => s.updateRelationship);
   const deleteRelationship = useStore((s) => s.deleteRelationship);
+  const updateTablePosition = useStore((s) => s.updateTablePosition);
 
+  // Modified to preserve existing positions
   const nodesFromTables = useMemo(
     () =>
       tables.map((table) => ({
@@ -104,13 +111,26 @@ export default function DBSchema() {
   const [nodes, setNodes, onNodesChange] = useNodesState(nodesFromTables);
   const [edges, setEdges, onEdgesChange] = useEdgesState(edgesFromRelations);
 
+  // Use ref to track if initial render has happened
+  const initialRenderDone = useRef(false);
+
   useEffect(() => {
-    setNodes(nodesFromTables);
-  }, [tables, setNodes]);
+    // Only update nodes initially or when tables length changes (new table added)
+    if (!initialRenderDone.current || tables.length !== nodes.length) {
+      setNodes(nodesFromTables);
+      initialRenderDone.current = true;
+    }
+  }, [tables, nodesFromTables, setNodes, nodes.length]);
 
   useEffect(() => {
     setEdges(edgesFromRelations);
   }, [edgesFromStore, setEdges]);
+
+  // Handle node position changes 
+  const onNodeDragStop = useCallback((event, node) => {
+    // Update the position in the store
+    updateTablePosition(node.id, node.position);
+  }, [updateTablePosition]);
 
   const onConnect = useCallback(
     (connection) => {
@@ -147,7 +167,7 @@ export default function DBSchema() {
     [pendingConnection, addRelationship]
   );
 
-  // Function to handle table creation and validation
+  // Function to handle table creation with center positioning
   const handleCreateTable = (tableName) => {
     setTableNameError(null); // Reset the error message
 
@@ -157,9 +177,15 @@ export default function DBSchema() {
       return;
     }
 
+    // Instead of using ReactFlow viewport, calculate position based on container size
+    // since we don't have access to the getViewport function
+    const flowBounds = reactFlowWrapper.current.getBoundingClientRect();
+    const centerX = flowBounds.width / 2 - 120; // Subtracting half of the table width
+    const centerY = flowBounds.height / 2 - 100; // Subtracting half of the table height
+
     const position = {
-      x: Math.floor(Math.random() * 500 + 100),
-      y: Math.floor(Math.random() * 400 + 100),
+      x: centerX,
+      y: centerY,
     };
 
     const newTableId = uuidv4();
@@ -175,65 +201,66 @@ export default function DBSchema() {
     });
     setSelectedRelationship(null);
   };
-const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, data, label }) => {
-  const onEdgeClick = (event) => {
-    event.stopPropagation(); // Prevents click on the background
-    setSelectedRelationship(edgesFromStore.find(edge => edge.id === id) || null);
+  
+  const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, data, label }) => {
+    const onEdgeClick = (event) => {
+      event.stopPropagation(); // Prevents click on the background
+      setSelectedRelationship(edgesFromStore.find(edge => edge.id === id) || null);
+    };
+
+    const dx = Math.abs(targetX - sourceX);
+    const dy = Math.abs(targetY - sourceY);
+
+    const curvature = 0.5;
+
+    const controlPointX1 = sourceX + dx * curvature;
+    const controlPointY1 = sourceY;
+    const controlPointX2 = targetX - dx * curvature;
+    const controlPointY2 = targetY;
+
+    const edgePath = `M ${sourceX} ${sourceY} C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, ${targetX} ${targetY}`;
+
+    return (
+      <>
+        {/* Clickable Hitbox */}
+        <path
+          id={`hitbox-${id}`}
+          className="react-flow__edge-path"
+          d={edgePath}
+          stroke="transparent"
+          strokeWidth={10} // Increased stroke width for wider clickable area
+          onClick={onEdgeClick}
+          style={{ pointerEvents: 'stroke' }} // only the stroke should trigger the click
+        />
+
+        {/* Visual Line */}
+        <path
+          id={id}
+          className="react-flow__edge-path"
+          d={edgePath}
+          markerEnd={data?.markerEnd ? `url(#marker-${data.markerEnd})` : undefined}
+          markerStart={data?.markerStart ? `url(#marker-${data.markerStart})` : undefined}
+          strokeWidth={4}  // Increased stroke width for thicker lines
+          stroke="#94a3b8"
+          style={{ pointerEvents: 'none' }} // the visual line should not trigger the click
+        />
+        {label && (
+            <text onClick={onEdgeClick} style={{ cursor: 'pointer' }}> {/* Add onClick and style */}
+                <textPath
+                    href={`#${id}`}
+                    style={{ fontSize: '12px' }}
+                    startOffset="50%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#555"
+                >
+                    {label}
+                </textPath>
+            </text>
+        )}
+      </>
+    );
   };
-
-  const dx = Math.abs(targetX - sourceX);
-  const dy = Math.abs(targetY - sourceY);
-
-  const curvature = 0.5;
-
-  const controlPointX1 = sourceX + dx * curvature;
-  const controlPointY1 = sourceY;
-  const controlPointX2 = targetX - dx * curvature;
-  const controlPointY2 = targetY;
-
-  const edgePath = `M ${sourceX} ${sourceY} C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, ${targetX} ${targetY}`;
-
-  return (
-    <>
-      {/* Clickable Hitbox */}
-      <path
-        id={`hitbox-${id}`}
-        className="react-flow__edge-path"
-        d={edgePath}
-        stroke="transparent"
-        strokeWidth={10} // Increased stroke width for wider clickable area
-        onClick={onEdgeClick}
-        style={{ pointerEvents: 'stroke' }} // only the stroke should trigger the click
-      />
-
-      {/* Visual Line */}
-      <path
-        id={id}
-        className="react-flow__edge-path"
-        d={edgePath}
-        markerEnd={data?.markerEnd ? `url(#marker-${data.markerEnd})` : undefined}
-        markerStart={data?.markerStart ? `url(#marker-${data.markerStart})` : undefined}
-        strokeWidth={4}  // Increased stroke width for thicker lines
-        stroke="#94a3b8"
-        style={{ pointerEvents: 'none' }} // the visual line should not trigger the click
-      />
-      {label && (
-          <text onClick={onEdgeClick} style={{ cursor: 'pointer' }}> {/* Add onClick and style */}
-              <textPath
-                  href={`#${id}`}
-                  style={{ fontSize: '12px' }}
-                  startOffset="50%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill="#555"
-              >
-                  {label}
-              </textPath>
-          </text>
-      )}
-    </>
-  );
-};
 
   const edgeTypes = {
     custom: CustomEdge,
@@ -243,18 +270,20 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, data, label }) => 
     deleteRelationship(relationshipId);
     setSelectedRelationship(null);
   };
+  
   return (
-    <div className="w-full h-full min-w-[600px] rounded-xl overflow-hidden border relative bg-white">
+    <div className="w-full h-full min-w-[600px] rounded-xl overflow-hidden border relative bg-white" ref={reactFlowWrapper}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         fitView
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        connectionMode="loose" // Добавьте эту строку
+        connectionMode="loose"
       >
         <svg style={{ position: 'absolute', width: 0, height: 0 }}>
           <defs>
@@ -331,5 +360,14 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, data, label }) => 
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// Main export component wrapped with ReactFlowProvider
+export default function DBSchema() {
+  return (
+    <ReactFlowProvider>
+      <DBSchemaFlow />
+    </ReactFlowProvider>
   );
 }

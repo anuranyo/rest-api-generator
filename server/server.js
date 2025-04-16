@@ -16,7 +16,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/schemas', schemaRoutes);
-//app.use('/api/generator', generatorRoutes);
+app.use('/api/generator', generatorRoutes);
 
 app.get('/', (req, res) =>{
    res.send('API Generator Server is running');  
@@ -47,5 +47,5 @@ connectDB();
 const PORT = process.env.PORT || 8000;
 
 app.listen(PORT, () => {
-    console.log(`Сервер запущено на порту ${PORT}`)
+    console.log(`Server started on port ${PORT}`)
 });

@@ -7,7 +7,7 @@ export const EditRelationshipModal = ({
   targetTable,
   onClose,
   onUpdateRelationship,
-  onDeleteRelationship, // New prop
+  onDeleteRelationship,
 }) => {
   const [sourceCardinality, setSourceCardinality] = useState(relationship.sourceCardinality || 'one');
   const [targetCardinality, setTargetCardinality] = useState(relationship.targetCardinality || 'many');
@@ -31,7 +31,7 @@ export const EditRelationshipModal = ({
   };
 
   const handleDelete = () => {
-    onDeleteRelationship(relationship.id); // Call the new prop
+    onDeleteRelationship(relationship.id);
     onClose();
   };
 
@@ -46,6 +46,10 @@ export const EditRelationshipModal = ({
       return 'many-to-one';
     }
   };
+
+  // Find the connected columns
+  const sourceColumn = sourceTable?.columns.find(col => col.id === relationship.sourceColumnId);
+  const targetColumn = targetTable?.columns.find(col => col.id === relationship.targetColumnId);
 
   return (
     <motion.div
@@ -72,6 +76,19 @@ export const EditRelationshipModal = ({
         </h4>
 
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">
+              Connected Fields:
+            </label>
+            <p className="text-sm">
+              {sourceTable.name}.{sourceColumn?.name} 
+              <span className="text-gray-400 text-xs"> ({sourceColumn?.fakerCategory}.{sourceColumn?.fakerType})</span>
+              {" → "}
+              {targetTable.name}.{targetColumn?.name}
+              <span className="text-gray-400 text-xs"> ({targetColumn?.fakerCategory}.{targetColumn?.fakerType})</span>
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">
               Relationship Type:

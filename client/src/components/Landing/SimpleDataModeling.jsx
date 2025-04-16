@@ -1,9 +1,5 @@
 import { useState } from "react";
 
-const generatorOptions = [
-  "Faker.js", "String", "Number", "Boolean", "Object", "Array", "Date"
-];
-
 const fakerTypes = [
   "address.city", "address.country", "internet.email", "name.fullName",
   "image.avatar", "date.recent", "address.buildingNumber"
@@ -17,15 +13,6 @@ export default function SimpleDataModeling() {
   ]);
 
   const [dropdownIndex, setDropdownIndex] = useState(null);
-  const [dropdownType, setDropdownType] = useState("generator");
-
-  const handleGeneratorSelect = (i, value) => {
-    const updated = [...fields];
-    updated[i].generator = value;
-    updated[i].type = value === "Faker.js" ? fakerTypes[0] : value;
-    setFields(updated);
-    setDropdownIndex(null);
-  };
 
   const handleTypeSelect = (i, value) => {
     const updated = [...fields];
@@ -38,7 +25,7 @@ export default function SimpleDataModeling() {
     const newFieldName = `field${fields.length + 1}`;
     setFields([
       ...fields,
-      { name: newFieldName, generator: "String", type: "String" }
+      { name: newFieldName, generator: "Faker.js", type: fakerTypes[0] }
     ]);
   };
 
@@ -59,7 +46,7 @@ export default function SimpleDataModeling() {
         </div>
 
         <div className="col-span-5 relative before:block before:absolute before:rounded-xl before:opacity-40 before:-inset-1 before:-skew-y-3 before:scale-110 before:rotate-6 before:bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
-          <div className="relative bg-white shadow-xl rounded-2xl p-6 space-y-4">
+          <div className="relative bg-white shadow-xl rounded-2xl p-6 space-y-4 z-10 overflow-visible">
             <h4 className="uppercase text-xs text-gray-400 font-bold tracking-wider">
               Resource schema
             </h4>
@@ -76,7 +63,7 @@ export default function SimpleDataModeling() {
 
             {/* Field Rows */}
             {fields.map((field, i) => (
-              <div key={i} className="grid grid-cols-10 gap-2 items-center relative z-10">
+              <div key={i} className="grid grid-cols-10 gap-2 items-center relative z-0">
                 {/* Field name */}
                 <div className="col-span-3">
                   <input
@@ -86,43 +73,22 @@ export default function SimpleDataModeling() {
                   />
                 </div>
 
-                {/* Generator */}
-                <div className="col-span-3 relative">
-                  <div
-                    onClick={() => {
-                      setDropdownIndex(i);
-                      setDropdownType("generator");
-                    }}
-                    className="bg-gray-100 px-3 py-2 rounded-xl font-mono text-sm cursor-pointer"
-                  >
-                    {field.generator}
+                {/* Generator (Faker.js — без dropdown) */}
+                <div className="col-span-3">
+                  <div className="bg-gray-100 px-3 py-2 rounded-xl font-mono text-sm">
+                    Faker.js
                   </div>
-                  {dropdownIndex === i && dropdownType === "generator" && (
-                    <DropdownMenu
-                      items={generatorOptions}
-                      onSelect={(val) => handleGeneratorSelect(i, val)}
-                    />
-                  )}
                 </div>
 
-                {/* Type or Faker */}
-                <div className="col-span-3 relative">
+                {/* Faker type dropdown */}
+                <div className="col-span-3 relative z-[101]"> {/* Added z-[101] class here */}
                   <div
-                    onClick={() => {
-                      if (field.generator === "Faker.js") {
-                        setDropdownIndex(i);
-                        setDropdownType("faker");
-                      }
-                    }}
-                    className={`${
-                      field.generator === "Faker.js"
-                        ? "cursor-pointer"
-                        : "opacity-60"
-                    } bg-gray-100 px-3 py-2 rounded-xl font-mono text-sm`}
+                    onClick={() => setDropdownIndex(i)}
+                    className="cursor-pointer bg-gray-100 px-3 py-2 rounded-xl font-mono text-sm z-100"
                   >
                     {field.type}
                   </div>
-                  {dropdownIndex === i && dropdownType === "faker" && field.generator === "Faker.js" && (
+                  {dropdownIndex === i && (
                     <DropdownMenu
                       items={fakerTypes}
                       onSelect={(val) => handleTypeSelect(i, val)}
@@ -136,7 +102,7 @@ export default function SimpleDataModeling() {
             <div>
               <button
                 onClick={handleAddField}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow z-10 relative"
               >
                 <span className="text-lg font-bold">+</span> Add Field
               </button>
@@ -150,7 +116,7 @@ export default function SimpleDataModeling() {
 
 function DropdownMenu({ items, onSelect }) {
   return (
-    <div className="absolute top-12 left-0 w-full bg-white border border-gray-200 rounded-xl shadow-md z-40">
+  <div className="absolute top-12 left-0 w-full bg-white border border-gray-200 rounded-xl shadow-md z-auto"> 
       <input
         placeholder="Search..."
         className="w-full px-3 py-2 border-b border-gray-200 outline-none text-sm"

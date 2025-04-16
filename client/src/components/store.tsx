@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 
-// Export the types so they can be imported in other files
-export type ColumnType = 'string' | 'integer' | 'boolean' | 'float' | 'date';
+// Export the types for faker categories and types
+export type FakerCategory = 'address' | 'commerce' | 'company' | 'database' | 'date' | 
+  'finance' | 'hacker' | 'image' | 'internet' | 'lorem' | 'name' | 'phone' | 'random' | 'system' | 'vehicle' | '';
 
+// Instead of column types, we're using faker types
 export interface Column {
   id: string;
   name: string;
-  type: ColumnType;
+  useFaker: boolean;
+  fakerCategory: FakerCategory;
+  fakerType: string;
   isPrimaryKey: boolean;
   isForeignKey: boolean;
   isNullable: boolean;
@@ -26,7 +30,7 @@ export interface Relationship {
   sourceColumnId: string;
   targetTableId: string;
   targetColumnId: string;
-  // New properties for enhanced relationships
+  // Properties for enhanced relationships
   sourceHandleId?: string;
   targetHandleId?: string;
   sourceCardinality?: 'one' | 'many';
@@ -39,7 +43,7 @@ interface DiagramState {
   relationships: Relationship[];
   addTable: (name: string, position: { x: number; y: number }, id?: string) => void;
   removeTable: (tableId: string) => void;
-  addColumn: (tableId: string, name: string, type: ColumnType) => void;
+  addColumn: (tableId: string, name: string, fakerCategory: FakerCategory, fakerType: string) => void;
   updateColumn: (tableId: string, columnId: string, updates: Partial<Column>) => void;
   removeColumn: (tableId: string, columnId: string) => void;
   addRelationship: (relationship: Omit<Relationship, 'id'> & { id?: string }) => void;
@@ -55,7 +59,7 @@ const generateUUID = () => {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 };
 
-export const useStore = create<DiagramState>((set, get) => ({ // Изменено: добавлен get в аргументы create
+export const useStore = create<DiagramState>((set, get) => ({
   tables: [],
   relationships: [],
 
@@ -65,7 +69,7 @@ export const useStore = create<DiagramState>((set, get) => ({ // Изменен�
       return;
     }
 
-    const existingTable = get().tables.find((table) => table.name.toLowerCase() === name.trim().toLowerCase()); // Используем get() для доступа к текущему состоянию
+    const existingTable = get().tables.find((table) => table.name.toLowerCase() === name.trim().toLowerCase());
     if (existingTable) {
       alert('Table with this name already exists.');
       return;
@@ -81,7 +85,9 @@ export const useStore = create<DiagramState>((set, get) => ({ // Изменен�
             {
               id: generateUUID(),
               name: 'id',
-              type: 'integer',
+              useFaker: true,
+              fakerCategory: 'database',
+              fakerType: 'mongodbObjectId',
               isPrimaryKey: true,
               isForeignKey: false,
               isNullable: false,
@@ -103,7 +109,7 @@ export const useStore = create<DiagramState>((set, get) => ({ // Изменен�
     }));
   },
 
-  addColumn: (tableId, name, type) => {
+  addColumn: (tableId, name, fakerCategory, fakerType) => {
     if (!name.trim()) {
       console.error('Column name cannot be empty.');
       return;
@@ -119,7 +125,9 @@ export const useStore = create<DiagramState>((set, get) => ({ // Изменен�
               {
                 id: generateUUID(),
                 name,
-                type,
+                useFaker: true,
+                fakerCategory,
+                fakerType,
                 isPrimaryKey: false,
                 isForeignKey: false,
                 isNullable: true,

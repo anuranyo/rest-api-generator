@@ -1,22 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function Header() {
-  const [isAuth, setIsAuth] = useState(false);
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const authFlag = localStorage.getItem("auth");
-    setIsAuth(authFlag === "true");
-  }, []);
-
   const handleLogout = () => {
-    // Remove authentication flag from localStorage
-    localStorage.removeItem("auth");
+    // Use the logout function from AuthContext
+    logout();
     
-    // Update authentication state
-    setIsAuth(false);
-
     // Explicitly navigate to the unsigned home page
     navigate("/");
   };
@@ -38,7 +30,7 @@ export default function Header() {
             Docs
           </a>
 
-          {isAuth ? (
+          {currentUser ? (
             <button
               onClick={handleLogout}
               className="px-4 py-1 text-lg border border-blue-900 rounded-full hover:bg-blue-50"

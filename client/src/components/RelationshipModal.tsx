@@ -85,7 +85,7 @@ export function RelationshipModal({
             <option value="">Select Source Column</option>
             {sourceTables[0]?.columns.map((col) => (
               <option key={col.id} value={col.id}>
-                {col.name} ({col.type})
+                {col.name} ({col.fakerCategory}.{col.fakerType})
               </option>
             ))}
           </select>
@@ -126,7 +126,7 @@ export function RelationshipModal({
             <option value="">Select Target Column</option>
             {targetTables[0]?.columns.map((col) => (
               <option key={col.id} value={col.id}>
-                {col.name} ({col.type})
+                {col.name} ({col.fakerCategory}.{col.fakerType})
               </option>
             ))}
           </select>

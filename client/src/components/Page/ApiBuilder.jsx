@@ -20,9 +20,12 @@ const ApiBuilder = () => {
 
   const schemaRef = useRef(null); // useRef to hold the schema reference
 
+  // Определяем, показывать ли Import панель (показываем только если нет таблиц)
+  const showImportPanel = tables.length === 0;
+
   useEffect(() => {
     if (tables.length > 0) {
-      // Generate comprehensive JSON schema
+      // Generate comprehensive JSON schema with Faker.js details
       const schema = {
         tables: tables.map((table) => ({
           name: table.name,
@@ -30,13 +33,17 @@ const ApiBuilder = () => {
             // Find any relationships for this column
             const relatedRelationships = relationships.filter(
               rel =>
-                rel.sourceTableId === table.id && rel.sourceColumnId === col.id ||
-                rel.targetTableId === table.id && rel.targetColumnId === col.id
+                (rel.sourceTableId === table.id && rel.sourceColumnId === col.id) ||
+                (rel.targetTableId === table.id && rel.targetColumnId === col.id)
             );
 
             const columnSchema = {
               name: col.name,
-              type: col.type,
+              faker: {
+                active: col.useFaker,
+                category: col.fakerCategory,
+                type: col.fakerType
+              },
               constraints: {
                 primaryKey: col.isPrimaryKey,
                 foreignKey: col.isForeignKey,
@@ -66,6 +73,8 @@ const ApiBuilder = () => {
         relationships: relationships.map(rel => ({
           id: rel.id,
           type: rel.type,
+          sourceCardinality: rel.sourceCardinality || 'one',
+          targetCardinality: rel.targetCardinality || 'many',
           source: {
             table: tables.find(t => t.id === rel.sourceTableId)?.name || '',
             column: tables.find(t => t.id === rel.sourceTableId)?.columns.find(c => c.id === rel.sourceColumnId)?.name || ''
@@ -94,6 +103,7 @@ const ApiBuilder = () => {
   const handleDragOver = (e) => {
     e.preventDefault();
   };
+  
   const processSchemaTables = (schema) => { // Function to process tables only
     return new Promise((resolve) => { // Return a Promise
       const tableMap = new Map();
@@ -122,10 +132,15 @@ const ApiBuilder = () => {
 
         if (tableSchema.columns && Array.isArray(tableSchema.columns)) {
           tableSchema.columns.forEach(colSchema => {
-            if (!colSchema.name || !colSchema.type) {
-              throw new Error(`Column in table ${tableSchema.name} missing name or type`);
+            if (!colSchema.name) {
+              throw new Error(`Column in table ${tableSchema.name} missing name`);
             }
             console.log(`Processing column "${colSchema.name}" in table "${tableSchema.name}"`);
+
+            // Default faker values if not provided
+            const fakerCategory = colSchema.faker?.category || 'name';
+            const fakerType = colSchema.faker?.type || 'fullName';
+            const useFaker = colSchema.faker?.active !== false; // Default to true if not specified
 
             const isPrimaryKeyId = colSchema.name === 'id' && colSchema.constraints?.primaryKey;
             let columnId;
@@ -142,20 +157,27 @@ const ApiBuilder = () => {
                     isPrimaryKey: true,
                     isForeignKey: !!colSchema.references,
                     isNullable: !!colSchema.constraints?.nullable,
-                    isUnique: !!colSchema.constraints?.unique
+                    isUnique: !!colSchema.constraints?.unique,
+                    useFaker: useFaker,
+                    fakerCategory: fakerCategory,
+                    fakerType: fakerType
                   });
                   console.log(`Updated default column "id" in table "${tableSchema.name}" with constraints. Column ID: ${columnId}`);
                 }
               }
             } else {
               columnId = uuidv4();
-              addColumn(tableId, colSchema.name, colSchema.type, columnId);
+              // Use the new column structure with Faker.js
+              addColumn(tableId, colSchema.name, fakerCategory, fakerType);
               console.log(`addColumn called for column "${colSchema.name}" in table "${tableSchema.name}". New Column ID: ${columnId}`);
               updateColumn(tableId, columnId, {
                 isPrimaryKey: !!colSchema.constraints?.primaryKey,
                 isForeignKey: !!colSchema.constraints?.foreignKey || !!colSchema.references,
                 isNullable: !!colSchema.constraints?.nullable,
-                isUnique: !!colSchema.constraints?.unique
+                isUnique: !!colSchema.constraints?.unique,
+                useFaker: useFaker,
+                fakerCategory: fakerCategory,
+                fakerType: fakerType
               });
             }
 
@@ -216,7 +238,9 @@ const ApiBuilder = () => {
                 sourceColumnId: sourceColumnId,
                 targetTableId: targetTableId,
                 targetColumnId: targetColumnId,
-                type: relSchema.type || 'one-to-many'
+                type: relSchema.type || 'one-to-many',
+                sourceCardinality: relSchema.sourceCardinality || 'one',
+                targetCardinality: relSchema.targetCardinality || 'many'
               };
               console.log("Adding relationship:", relationshipToAdd);
               addRelationship(relationshipToAdd);
@@ -259,12 +283,29 @@ const ApiBuilder = () => {
                   const reverseRelationshipKey = `${targetTableId}:${targetColumnId}-${tableId}:${sourceColumnId}`;
 
                   if (!addedRelationships.has(relationshipKey) && !addedRelationships.has(reverseRelationshipKey)) {
+                    // Parse relationship type to determine cardinality
+                    let sourceCardinality = 'one';
+                    let targetCardinality = 'many';
+                    
+                    if (colSchema.references.relationship === 'one-to-one') {
+                      sourceCardinality = 'one';
+                      targetCardinality = 'one';
+                    } else if (colSchema.references.relationship === 'many-to-many') {
+                      sourceCardinality = 'many';
+                      targetCardinality = 'many';
+                    } else if (colSchema.references.relationship === 'many-to-one') {
+                      sourceCardinality = 'many';
+                      targetCardinality = 'one';
+                    }
+                    
                     const relationshipToAdd = {
                       sourceTableId: tableId,
                       sourceColumnId: sourceColumnId,
                       targetTableId: targetTableId,
                       targetColumnId: targetColumnId,
-                      type: colSchema.references.relationship || 'one-to-many'
+                      type: colSchema.references.relationship || 'one-to-many',
+                      sourceCardinality,
+                      targetCardinality
                     };
                     console.log("Adding relationship from references:", relationshipToAdd);
                     addRelationship(relationshipToAdd);
@@ -344,45 +385,55 @@ const ApiBuilder = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-gray-50 mt-16 h-screen">
         {/* Left Side: Schema Graph Sandbox */}
-        <div className="bg-white shadow rounded-2xl p-6 overflow-y-auto">
+        <div className="bg-white shadow rounded-2xl p-6 overflow-y-auto h-2/5">
           <DBSchema />
         </div>
 
         {/* Right Side: JSON Import + Output */}
-        <div
-          onDrop={handleFileDrop}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          className={`bg-white shadow rounded-2xl p-6 border-2 border-dashed ${
-            isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
-          } flex flex-col gap-4 transition-colors duration-200 relative`}
-        >
-          {importSuccess && (
-            <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow">
-              Schema imported successfully!
+        <div className="bg-white shadow rounded-2xl p-6 transition-colors duration-200 relative">
+          {/* Панель импорта JSON (видима только если нет таблиц) */}
+          {showImportPanel ? (
+            <div
+              onDrop={handleFileDrop}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              className={`absolute inset-0 rounded-2xl border-2 border-dashed p-6 flex flex-col gap-4 ${
+                isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+              }`}
+            >
+              {importSuccess && (
+                <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow">
+                  Schema imported successfully!
+                </div>
+              )}
+
+              <div className="text-center text-gray-600 py-8">
+                <div className="text-4xl mb-4">📥</div>
+                <p className="font-medium text-lg mb-2">Drag and Drop JSON Schema File Here</p>
+                <p className="text-sm text-gray-400 mb-4">Only JSON files (.json) are accepted</p>
+                <p className="text-sm text-gray-500">
+                  The schema will be used to create tables in the diagram
+                </p>
+              </div>
             </div>
-          )}
+          ) : null}
 
-          <div className="text-center text-gray-600 py-8">
-            <div className="text-4xl mb-4">📥</div>
-            <p className="font-medium text-lg mb-2">Drag and Drop JSON Schema File Here</p>
-            <p className="text-sm text-gray-400 mb-4">Only JSON files (.json) are accepted</p>
-            <p className="text-sm text-gray-500">
-              The schema will be used to create tables in the diagram
-            </p>
-          </div>
-
-          {jsonSchema && (
-            <div className="text-left mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Current JSON Schema</h4>
+          {/* Отображение JSON (всегда видимо) */}
+          <div className={`${showImportPanel ? 'invisible' : 'visible'}`}>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">Current JSON Schema</h4>
+            {jsonSchema ? (
               <div className="bg-gray-100 p-3 rounded text-left">
                 <pre className="text-xs whitespace-pre-wrap break-words font-mono max-h-[500px] overflow-y-auto">
                   {JSON.stringify(jsonSchema, null, 2)}
                 </pre>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                No schema available yet. Add tables to the diagram to generate a schema.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

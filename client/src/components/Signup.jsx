@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Navigate, useNavigate } from 'react-router-dom';
 
-export default function RegisterForm() {
+export default function Signup() {
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -10,6 +12,14 @@ export default function RegisterForm() {
   });
 
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const { register, currentUser } = useAuth();
+  const navigate = useNavigate();
+
+  // If user is already logged in, redirect to home
+  if (currentUser) {
+    return <Navigate to="/" />;
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -17,14 +27,36 @@ export default function RegisterForm() {
     setError(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const { name, email, password, confirmPassword } = form;
-    if (!name || !email || !password || password !== confirmPassword) {
-      setError('Please fill all fields correctly');
+    
+    // Form validation
+    if (!name || !email || !password) {
+      setError('Please fill all required fields');
       return;
     }
-    alert('Registration successful!');
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await register(name, email, password);
+      navigate('/');
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,6 +78,7 @@ export default function RegisterForm() {
             placeholder="Name"
             value={form.name}
             onChange={handleChange}
+            disabled={loading}
           />
           <input
             className="w-full border px-4 py-2 rounded-xl"
@@ -54,6 +87,7 @@ export default function RegisterForm() {
             placeholder="Email"
             value={form.email}
             onChange={handleChange}
+            disabled={loading}
           />
           <input
             className="w-full border px-4 py-2 rounded-xl"
@@ -62,6 +96,7 @@ export default function RegisterForm() {
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
+            disabled={loading}
           />
           <input
             className="w-full border px-4 py-2 rounded-xl"
@@ -70,13 +105,15 @@ export default function RegisterForm() {
             placeholder="Confirm Password"
             value={form.confirmPassword}
             onChange={handleChange}
+            disabled={loading}
           />
           {error && <div className="text-red-600 text-sm font-semibold">{error}</div>}
           <button
             type="submit"
             className="w-full bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 transition"
+            disabled={loading}
           >
-            Register
+            {loading ? 'Signing up...' : 'Register'}
           </button>
         </form>
         <div className="text-center text-blue-600 mt-4 text-sm space-y-1">
