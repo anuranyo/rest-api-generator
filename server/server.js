@@ -12,11 +12,13 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: '*',
+  origin: ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+app.options('*', cors());
 
 // Health check route
 app.get('/', (req, res) => {

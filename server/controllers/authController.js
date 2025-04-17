@@ -8,13 +8,12 @@ const nodemailer = require('nodemailer');
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-    }
-})
+// Импортируем mailjet правильно
+const mailjet = require('node-mailjet');
+const mailjetClient = mailjet.apiConnect(
+    process.env.API_KEY,
+    process.env.SECRET_KEY
+);
 
 const createToken = (user) => {
     return jwt.sign(
@@ -125,7 +124,7 @@ const login = async (req, res) => {
  * @access  Public
  */
 
-const forgotPassword = async (req, res) =>{
+const forgotPassword = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -151,18 +150,28 @@ const forgotPassword = async (req, res) =>{
       
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
       
-        const mailOptions = {
-            to: user.email,
-            from: process.env.EMAIL_FROM,
-            subject: 'Відновлення паролю',
-            text: `Ви отримали цей лист, тому що ви (або хтось інший) запросили скидання паролю для вашого облікового запису.\n\n
-                   Будь ласка, перейдіть за наступним посиланням або вставте його у свій браузер для завершення процесу:\n\n
-                   ${resetUrl}\n\n
-                   Якщо ви не запитували це, проігноруйте цей лист, і ваш пароль залишиться незмінним.\n`
-        };
-      
         try {
-            await transporter.sendMail(mailOptions);
+            const request = await mailjetClient.post('send', { version: 'v3.1' }).request({
+                Messages: [
+                    {
+                        From: {
+                            Email: "", ////////////////////////////////////////////
+                            Name: "REST API Generator"
+                        },
+                        To: [
+                            {
+                                Email: user.email
+                            }
+                        ],
+                        TemplateID: 6908299,
+                        TemplateLanguage: true,
+                        Variables: {
+                            reset_link: resetUrl
+                        }
+                    }
+                ]
+            });
+            
             res.json({ message: 'Інструкція з відновлення паролю надіслана на ваш email' });
         } catch (error) {
             console.error('Помилка при відправці електронної пошти:', error);
@@ -174,14 +183,13 @@ const forgotPassword = async (req, res) =>{
     }
 }
 
-
 /**
  * @route   POST /api/auth/reset-password
  * @desc    Скидання паролю
  * @access  Public
  */
 
-const resetPassword = async (req, res) =>{
+const resetPassword = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -212,15 +220,24 @@ const resetPassword = async (req, res) =>{
         
         await user.save();
     
-        const mailOptions = {
-            to: user.email,
-            from: process.env.EMAIL_FROM,
-            subject: 'Пароль змінено успішно',
-            text: `Це підтвердження того, що пароль для вашого облікового запису ${user.email} був успішно змінений.\n`
-        };
-    
         try {
-            await transporter.sendMail(mailOptions);
+            await mailjetClient.post('send', { version: 'v3.1' }).request({
+                Messages: [
+                    {
+                        From: {
+                            Email: "restapigen@zohomail.eu",
+                            Name: "REST API Generator"
+                        },
+                        To: [
+                            {
+                                Email: user.email
+                            }
+                        ],
+                        Subject: "Пароль змінено успішно",
+                        TextPart: `Це підтвердження того, що пароль для вашого облікового запису ${user.email} був успішно змінений.`
+                    }
+                ]
+            });
         } catch (error) {
             console.error('Помилка при відправці електронної пошти підтвердження:', error);
         }
