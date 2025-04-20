@@ -8,13 +8,6 @@ const nodemailer = require('nodemailer');
 
 dotenv.config();
 
-// Импортируем mailjet правильно
-const mailjet = require('node-mailjet');
-const mailjetClient = mailjet.apiConnect(
-    process.env.API_KEY,
-    process.env.SECRET_KEY
-);
-
 const createToken = (user) => {
     return jwt.sign(
         { userId: user._id, email: user.email, subscription: user.subscription },

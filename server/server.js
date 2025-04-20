@@ -12,7 +12,7 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000'],
+  origin: ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -27,15 +27,15 @@ app.get('/', (req, res) => {
 
 // Import routes with absolute paths
 const authRoutes = require(path.join(__dirname, './routes/authRoutes'));
-const projectRoutes = require(path.join(__dirname, './routes/projectRoutes'));
-const schemaRoutes = require(path.join(__dirname, './routes/schemaRoutes'));
-const generatorRoutes = require(path.join(__dirname, './routes/generatorRoutes'));
+// const projectRoutes = require(path.join(__dirname, './routes/projectRoutes'));
+// const schemaRoutes = require(path.join(__dirname, './routes/schemaRoutes'));
+// const generatorRoutes = require(path.join(__dirname, './routes/generatorRoutes'));
 
 // Apply routes
 app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/schemas', schemaRoutes);
-app.use('/api/generator', generatorRoutes);
+// app.use('/api/projects', projectRoutes);
+// app.use('/api/schemas', schemaRoutes);
+// app.use('/api/generator', generatorRoutes);
 
 // MongoDB connection state
 let isConnected = false;
