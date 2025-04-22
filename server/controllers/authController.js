@@ -118,62 +118,7 @@ const login = async (req, res) => {
  */
 
 const forgotPassword = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-      
-        const { email } = req.body;
-      
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.json({ message: 'Якщо обліковий запис існує, інструкція з відновлення паролю була надіслана на email' });
-        }
-      
-        const resetToken = crypto.randomBytes(20).toString('hex');
-        const resetTokenHash = crypto
-            .createHash('sha256')
-            .update(resetToken)
-            .digest('hex');
-      
-        user.resetPasswordToken = resetTokenHash;
-        user.resetPasswordExpires = Date.now() + 3600000; 
-        await user.save();
-      
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-      
-        try {
-            const request = await mailjetClient.post('send', { version: 'v3.1' }).request({
-                Messages: [
-                    {
-                        From: {
-                            Email: "", ////////////////////////////////////////////
-                            Name: "REST API Generator"
-                        },
-                        To: [
-                            {
-                                Email: user.email
-                            }
-                        ],
-                        TemplateID: 6908299,
-                        TemplateLanguage: true,
-                        Variables: {
-                            reset_link: resetUrl
-                        }
-                    }
-                ]
-            });
-            
-            res.json({ message: 'Інструкція з відновлення паролю надіслана на ваш email' });
-        } catch (error) {
-            console.error('Помилка при відправці електронної пошти:', error);
-            res.status(500).json({ message: 'Не вдалося відправити електронний лист для відновлення паролю' });
-        }
-    } catch (error) {
-        console.error('Помилка запиту на скидання паролю:', error);
-        res.status(500).json({ message: 'Помилка сервера' });
-    }
+
 }
 
 /**
@@ -183,63 +128,7 @@ const forgotPassword = async (req, res) => {
  */
 
 const resetPassword = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-    
-        const { token, password } = req.body;
-    
-        const resetTokenHash = crypto
-            .createHash('sha256')
-            .update(token)
-            .digest('hex');
-    
-        const user = await User.findOne({
-            resetPasswordToken: resetTokenHash,
-            resetPasswordExpires: { $gt: Date.now() }
-        });
-    
-        if (!user) {
-            return res.status(400).json({ message: 'Токен для скидання паролю недійсний або закінчився' });
-        }
-    
-        const salt = await bcrypt.genSalt(10);
-        user.passwordHash = await bcrypt.hash(password, salt);
-        
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-        
-        await user.save();
-    
-        try {
-            await mailjetClient.post('send', { version: 'v3.1' }).request({
-                Messages: [
-                    {
-                        From: {
-                            Email: "restapigen@zohomail.eu",
-                            Name: "REST API Generator"
-                        },
-                        To: [
-                            {
-                                Email: user.email
-                            }
-                        ],
-                        Subject: "Пароль змінено успішно",
-                        TextPart: `Це підтвердження того, що пароль для вашого облікового запису ${user.email} був успішно змінений.`
-                    }
-                ]
-            });
-        } catch (error) {
-            console.error('Помилка при відправці електронної пошти підтвердження:', error);
-        }
-    
-        res.json({ message: 'Пароль успішно змінено' });
-    } catch (error) {
-        console.error('Помилка скидання паролю:', error);
-        res.status(500).json({ message: 'Помилка сервера' });
-    }
+
 }
 
 

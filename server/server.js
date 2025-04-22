@@ -12,13 +12,25 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5173'],
+  origin: function(origin, callback) {
+    const allowedOrigins = ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5173'];
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(null, false);
+    }
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
-app.options('*', cors());
+app.options('*', (req, res) => {
+  res.status(200).end();
+});
 
 // Health check route
 app.get('/', (req, res) => {
