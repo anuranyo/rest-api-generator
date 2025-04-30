@@ -58,7 +58,9 @@ const connectDB = async () => {
   
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      dbName: 'RestApiGenerator'
+      dbName: 'RestApiGenerator',
+      serverSelectionTimeoutMS: 15000, // Increase from default 10000ms
+      socketTimeoutMS: 45000, // Increase from default 20000ms
     });
     
     isConnected = true;
