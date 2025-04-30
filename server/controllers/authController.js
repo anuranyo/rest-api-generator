@@ -106,7 +106,7 @@ const login = async (req, res) => {
         });
     } catch (error){
         console.error('Помилка авторизації'), error;
-        res.status(500).json({ message: 'Помилка сервера'});
+        res.status(500).json({ message: 'Помилка сервера' + error});
     }
 }
 
