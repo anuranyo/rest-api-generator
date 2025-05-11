@@ -22,8 +22,8 @@ export default function Signup() {
   }
 
   const handleChange = (e) => {
-    const { nickname, value } = e.target;
-    setForm((prev) => ({ ...prev, [nickname]: value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
     setError(null);
   };
 
@@ -65,60 +65,60 @@ export default function Signup() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      <div classnickname="max-w-md mx-auto my-20 font-mono">
-        <h1 classnickname="text-3xl font-bold text-center mb-8">Register</h1>
+      <div className="max-w-md mx-auto my-20 font-mono">
+        <h1 className="text-3xl font-bold text-center mb-8">Register</h1>
         <form
           onSubmit={handleSubmit}
-          classnickname="space-y-4 bg-white shadow-2xl p-8 rounded-2xl border"
+          className="space-y-4 bg-white shadow-2xl p-8 rounded-2xl border"
         >
           <input
-            classnickname="w-full border px-4 py-2 rounded-xl"
+            className="w-full border px-4 py-2 rounded-xl"
             type="text"
-            nickname="nickname"
+            name="nickname"
             placeholder="Nickname"
             value={form.nickname}
             onChange={handleChange}
             disabled={loading}
           />
           <input
-            classnickname="w-full border px-4 py-2 rounded-xl"
+            className="w-full border px-4 py-2 rounded-xl"
             type="email"
-            nickname="email"
+            name="email"
             placeholder="Email"
             value={form.email}
             onChange={handleChange}
             disabled={loading}
           />
           <input
-            classnickname="w-full border px-4 py-2 rounded-xl"
+            className="w-full border px-4 py-2 rounded-xl"
             type="password"
-            nickname="password"
+            name="password"
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
             disabled={loading}
           />
           <input
-            classnickname="w-full border px-4 py-2 rounded-xl"
+            className="w-full border px-4 py-2 rounded-xl"
             type="password"
-            nickname="confirmPassword"
+            name="confirmPassword"
             placeholder="Confirm Password"
             value={form.confirmPassword}
             onChange={handleChange}
             disabled={loading}
           />
-          {error && <div classnickname="text-red-600 text-sm font-semibold">{error}</div>}
+          {error && <div className="text-red-600 text-sm font-semibold">{error}</div>}
           <button
             type="submit"
-            classnickname="w-full bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 transition"
+            className="w-full bg-indigo-600 text-white py-2 rounded-xl hover:bg-indigo-700 transition"
             disabled={loading}
           >
             {loading ? 'Signing up...' : 'Register'}
           </button>
         </form>
-        <div classnickname="text-center text-blue-600 mt-4 text-sm space-y-1">
-          <a href="/reset" classnickname="block hover:underline">Forgot password</a>
-          <a href="/login" classnickname="block hover:underline">Sign in</a>
+        <div className="text-center text-blue-600 mt-4 text-sm space-y-1">
+          <a href="/reset" className="block hover:underline">Forgot password</a>
+          <a href="/login" className="block hover:underline">Sign in</a>
         </div>
       </div>
     </motion.div>
