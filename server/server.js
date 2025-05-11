@@ -4,17 +4,13 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load environment variables
 dotenv.config();
 
-// Create Express app
 const app = express();
 
-// Middlewares
 app.use(cors({
   origin: function(origin, callback) {
     const allowedOrigins = ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5173'];
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -32,18 +28,15 @@ app.get('/', (req, res) =>{
    res.send('API Generator Server is running');  
 });
 
-// Health check route
 app.get('/', (req, res) => {
   res.status(200).send('API Generator Server is running');
 });
 
-// Import routes with absolute paths
 const authRoutes = require(path.join(__dirname, './routes/authRoutes'));
 const projectRoutes = require(path.join(__dirname, './routes/projectRoutes'));
 const schemaRoutes = require(path.join(__dirname, './routes/schemaRoutes'));
 const generatorRoutes = require(path.join(__dirname, './routes/generatorRoutes'));
 
-// Apply routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/schemas', schemaRoutes);
@@ -53,18 +46,16 @@ app.options('*', (req, res) => {
   res.status(200).end();
 });
 
-// MongoDB connection state
 let isConnected = false;
 
-// MongoDB connection function
 const connectDB = async () => {
   if (isConnected) return;
   
   try {
     await mongoose.connect(process.env.MONGO_URI, {
       dbName: 'RestApiGenerator',
-      serverSelectionTimeoutMS: 15000, // Increase from default 10000ms
-      socketTimeoutMS: 45000, // Increase from default 20000ms
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000, 
     });
     
     isConnected = true;
@@ -75,7 +66,6 @@ const connectDB = async () => {
   }
 };
 
-// Connect to MongoDB before handling requests
 app.use(async (req, res, next) => {
   try {
     if (!isConnected) {
@@ -88,7 +78,6 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Start server if not in production (serverless) environment
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 8000;
   app.listen(PORT, () => {
@@ -97,5 +86,4 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Export the Express app for serverless functions
 module.exports = app;

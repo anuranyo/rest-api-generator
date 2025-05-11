@@ -3,7 +3,6 @@
 * @param {Object} schema - JSON схема для аналізу
 * @returns {Object} Результати аналізу з таблицями та зв'язками
 */
-
 const analyzeSchema = async (schema) => {
     try {
       const result = {
@@ -31,7 +30,6 @@ const analyzeSchema = async (schema) => {
 * @param {Array} tables - Масив таблиць
 * @returns {Array} Структуровані дані таблиць
 */
-
 const extractTablesFromArray = (tables) => {
     return tables.map(table => {
       const tableInfo = {
@@ -59,7 +57,6 @@ const extractTablesFromArray = (tables) => {
 * @param {Object} schema - JSON схема
 * @returns {Array} Структуровані дані таблиць
 */
-
 const extractTablesFromObject = (schema) => {
     const tables = [];
   
@@ -92,7 +89,6 @@ const extractTablesFromObject = (schema) => {
 * @param {Array} columns - Масив колонок
 * @returns {Array} Структуровані дані колонок
 */
-
 const processColumns = (columns) => {
     if (!Array.isArray(columns)) return [];
   
@@ -111,7 +107,6 @@ const processColumns = (columns) => {
 * @param {Object} fields - Об'єкт з полями
 * @returns {Array} Структуровані дані колонок
 */
-
 const processFields = (fields) => {
     const columns = [];
   
@@ -134,7 +129,6 @@ const processFields = (fields) => {
 * @param {Object} obj - Об'єкт для обробки
 * @returns {Array} Структуровані дані колонок
 */
-
 const processGenericObject = (obj) => {
     const columns = [];
   
@@ -172,7 +166,6 @@ const processGenericObject = (obj) => {
 * @param {Object} schema - Оригінальна схема
 * @returns {Array} Виявлені зв'язки
 */
-
 const detectRelations = (tables, schema) => {
     const relations = [];
     const tableMap = new Map(tables.map(table => [table.name, table]));
@@ -224,7 +217,6 @@ const detectRelations = (tables, schema) => {
 * @param {string} type - Тип даних з JSON-схеми
 * @returns {string} Стандартизований тип даних
 */
-
 const mapDataType = (type) => {
     if (!type) return 'string';
   
