@@ -28,8 +28,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.options('*', (req, res) => {
-  res.status(200).end();
+app.get('/', (req, res) =>{
+   res.send('API Generator Server is running');  
 });
 
 // Health check route
@@ -39,15 +39,19 @@ app.get('/', (req, res) => {
 
 // Import routes with absolute paths
 const authRoutes = require(path.join(__dirname, './routes/authRoutes'));
-// const projectRoutes = require(path.join(__dirname, './routes/projectRoutes'));
-// const schemaRoutes = require(path.join(__dirname, './routes/schemaRoutes'));
-// const generatorRoutes = require(path.join(__dirname, './routes/generatorRoutes'));
+const projectRoutes = require(path.join(__dirname, './routes/projectRoutes'));
+const schemaRoutes = require(path.join(__dirname, './routes/schemaRoutes'));
+const generatorRoutes = require(path.join(__dirname, './routes/generatorRoutes'));
 
 // Apply routes
 app.use('/api/auth', authRoutes);
-// app.use('/api/projects', projectRoutes);
-// app.use('/api/schemas', schemaRoutes);
-// app.use('/api/generator', generatorRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/schemas', schemaRoutes);
+app.use('/api/generator', generatorRoutes);
+
+app.options('*', (req, res) => {
+  res.status(200).end();
+});
 
 // MongoDB connection state
 let isConnected = false;

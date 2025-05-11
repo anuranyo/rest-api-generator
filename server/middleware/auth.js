@@ -4,11 +4,11 @@ module.exports = (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-        return res.status(401).json({ message: 'Відсутній токен авторизації' })
+        return res.status(401).json({ message: 'Відсутній токен авторизації' });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         req.user = decoded;
         next();
