@@ -21,24 +21,37 @@ const createToken = (user) => {
  * @desc    Реєстрація нового користувача
  * @access  Public
  */
-
 const registration = async (req, res) => {
+    console.log('Registration started');
+    console.log('Request body:', JSON.stringify(req.body));
+    
     try {
         const errors = validationResult(req);
         if(!errors.isEmpty()) {
+            console.log('Validation errors:', errors.array());
             return res.status(400).json({ errors: errors.array() });
         }
         
         const { email, password, nickname } = req.body;
+        console.log('Extracted data:', { email, nickname, passwordLength: password?.length });
 
+        console.log('Starting User.findOne query...');
+        const startTime = Date.now();
+        
         let user = await User.findOne({ email });
+        
+        console.log(`User.findOne completed in ${Date.now() - startTime}ms`);
+        console.log('User found:', user ? 'Yes' : 'No');
+        
         if (user) {
             return res.status(400).json({ message: 'Користувач з таким email вже існує' });
         }
     
+        console.log('Creating password hash...');
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
     
+        console.log('Creating new user...');
         user = new User({
             email,
             passwordHash,
@@ -46,7 +59,9 @@ const registration = async (req, res) => {
             subscription: 'free' 
         });
     
+        console.log('Saving user...');
         await user.save();
+        console.log('User saved successfully');
     
         const token = createToken(user);
     
@@ -61,8 +76,9 @@ const registration = async (req, res) => {
             },
         });
     } catch (error){
-        console.error('Помилка реєстрації', error);
-        res.status(500).json({ message: 'Помилка сервера'});
+        console.error('Помилка реєстрації:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ message: 'Помилка сервера: ' + error.message });
     }
 }
     
@@ -72,7 +88,6 @@ const registration = async (req, res) => {
  * @desc    Авторизація користувача
  * @access  Public
  */
-
 const login = async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -115,7 +130,6 @@ const login = async (req, res) => {
  * @desc    Запит на відновлення паролю
  * @access  Public
  */
-
 const forgotPassword = async (req, res) => {
     try {
       const errors = validationResult(req);
@@ -235,7 +249,6 @@ const resetPassword = async (req, res) => {
  * @desc    Отримання даних поточного користувача
  * @access  Private
  */
-
 const getUser = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];

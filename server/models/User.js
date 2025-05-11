@@ -3,9 +3,12 @@ const Schema = mongoose.Schema;
 
 const UserSchema = new Schema({
     email: {
-        type: String,
-        required: true,
-        unique: true
+        type: String, 
+        required: true, 
+        unique: true,
+        lowercase: true,
+        trim: true,
+        index: true
     },
     nickname:{
         type: String,
