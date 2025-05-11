@@ -9,7 +9,6 @@ const { validationResult } = require('express-validator');
  * @route POST /api/schemas/upload
  * @access Private
  */
-
 const uploadSchema = async (req,res) => {
     try {
         const errors = validationResult(req);
@@ -19,6 +18,13 @@ const uploadSchema = async (req,res) => {
 
         if (!req.file) {
             return res.status(400).json({ message: 'Будь ласка, завантажте JSON файл' });
+        }
+
+        console.log('Uploading file:', req.file); 
+        console.log('File path:', req.file.path);
+
+        if (!fs.existsSync(req.file.path)) {
+            return res.status(400).json({ message: 'Файл не знайдено після завантаження' });
         }
 
         const fileContent = fs.readFileSync(req.file.path, 'utf8');
@@ -65,7 +71,6 @@ const uploadSchema = async (req,res) => {
  * @route GET /api/schemas
  * @access Private
  */
-
 const getSchemas = async (req, res) => {
     try {
       const schemas = await SchemaFile.find({ userId: req.user.userId })
@@ -84,8 +89,6 @@ const getSchemas = async (req, res) => {
 * @route GET /api/schemas/:id
 * @access Private
 */
-
-
 const getSchemaById = async (req, res) => {
     try {
       const schema = await SchemaFile.findById(req.params.id);
@@ -110,7 +113,6 @@ const getSchemaById = async (req, res) => {
 * @route DELETE /api/schemas/:id
 * @access Private
 */
-
 const deleteSchema = async (req, res) => {
     try {
       const schema = await SchemaFile.findById(req.params.id);
@@ -135,7 +137,6 @@ const deleteSchema = async (req, res) => {
 * Базова перевірка валідності JSON-схеми
 * В реальному проекті варто використовувати спеціалізовані бібліотеки для валідації
 */
-
 const isValidSchema = (schema) => {
     try {
       if (schema.tables) {

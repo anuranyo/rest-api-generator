@@ -4,7 +4,9 @@ const { check } = require('express-validator');
 const { 
   getSubscriptionInfo, 
   validateSubscriptionForSchema, 
-  generateApi 
+  parseJsonSchema,  
+  generateApi,
+  previewGeneratedFiles
 } = require('../controllers/generatorController');
 const { 
   checkSubscription, 
@@ -28,10 +30,27 @@ router.post('/schema/validate', [
 
 router.post('/generate', [
     auth,
-    check('schema').notEmpty().withMessage('Схема обов\'язкова'),
+    check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий'),
     check('dbType').notEmpty().withMessage('Тип бази даних обов\'язковий'),
     checkSubscription,
     checkDatabaseType
 ], generateApi);
-  
+ 
+router.post('/parse', [
+  auth,
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий')
+], parseJsonSchema);
+
+router.post('/preview', [
+  auth,
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий')
+], previewGeneratedFiles);
+
+router.post('/generate', [
+  auth,
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий'),
+  check('dbType').notEmpty().withMessage('Тип бази даних обов\'язковий'),
+  checkSubscription
+], generateApi);
+
 module.exports = router;

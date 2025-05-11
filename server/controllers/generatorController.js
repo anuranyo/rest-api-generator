@@ -1,17 +1,16 @@
-const User = require('../models/User');
+const { subscriptionTypes, subscriptionLimits, subscriptionFeatures } = require('../utils/subscriptionLimits');
+const SchemaFile = require('../models/SchemaFile');
+const mongoModelGenerator = require('../services/mongoModelGenerator');
+const fs = require('fs');
+const path = require('path');
+const archiver = require('archiver');
 const { validationResult } = require('express-validator');
-const { 
-  subscriptionLimits, 
-  subscriptionFeatures, 
-  getMinimumSubscriptionRequired 
-} = require('../utils/subscriptionLimits');
 
 /**
  * Отримання інформації про підписку користувача
  * @route GET /api/generator/subscription/info
  * @access Private
  */
-
 const getSubscriptionInfo = async (req, res) => {
   try {
     const { subscription = 'free', email } = req.user;
@@ -39,7 +38,6 @@ const getSubscriptionInfo = async (req, res) => {
  * @route POST /api/generator/schema/validate
  * @access Private
  */
-
 const validateSubscriptionForSchema = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -98,7 +96,6 @@ const validateSubscriptionForSchema = async (req, res) => {
  * @route POST /api/generator/generate
  * @access Private
  */
-
 const generateApi = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -109,54 +106,107 @@ const generateApi = async (req, res) => {
       });
     }
 
+    const { schemaId, dbType, options } = req.body;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    if (!dbType || dbType.toLowerCase() !== 'mongodb') {
+      return res.status(400).json({
+        success: false,
+        message: 'Підтримується тільки тип бази даних MongoDB'
+      });
+    }
+
+    let schemaAnalysis = req.schemaStructure;
+    
+    if (!schemaAnalysis) {
+      const schema = await SchemaFile.findById(schemaId);
+      
+      if (!schema) {
+        return res.status(404).json({
+          success: false,
+          message: 'Схему не знайдено'
+        });
+      }
+      
+      if (schema.userId.toString() !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Доступ заборонено'
+        });
+      }
+      
+      schemaAnalysis = schema.structure;
+      
+      if (!schemaAnalysis || !schemaAnalysis.tables || schemaAnalysis.tables.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Схема не містить таблиць або має неправильний формат'
+        });
+      }
+    }
+    
     const { subscription = 'free' } = req.user;
-    const { schema, dbType } = req.body;
-    
-    if (!schema) {
-      return res.status(400).json({
-        success: false,
-        message: 'Схема обов\'язкова'
-      });
-    }
-    
-    if (!dbType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Тип бази даних обов\'язковий'
-      });
-    }
-    
-    if (dbType.toLowerCase() !== 'mongodb') {
-      return res.status(400).json({
-        success: false,
-        message: 'На даний момент підтримується тільки MongoDB'
-      });
-    }
-    
-    const collectionCount = Object.keys(schema).length;
     const tableLimit = subscriptionLimits[subscription] || 3;
     
-    if (collectionCount > tableLimit) {
+    if (schemaAnalysis.tables.length > tableLimit) {
       return res.status(403).json({
         success: false,
-        message: `Ваша підписка ${subscription} дозволяє створювати тільки ${tableLimit} таблиць. Ви намагаєтесь створити ${collectionCount} таблиць.`,
-        currentLimit: tableLimit,
-        requestedTables: collectionCount
+        message: `Ваша підписка дозволяє тільки ${tableLimit} таблиць. Схема містить ${schemaAnalysis.tables.length} таблиць.`
       });
     }
     
-    // Тут буде логіка генерації API на основі схеми
-    // Ця частина буде реалізована на наступних кроках
+    const generatedFiles = mongoModelGenerator.generateAllFiles(schemaAnalysis);
     
-    return res.status(200).json({
-      success: true,
-      message: 'Готово до генерації API',
-      validation: {
-        tablesCount: collectionCount,
-        tablesLimit: tableLimit,
-        subscription: subscription
-      }
+    const tempDir = path.join(__dirname, '../tmp', `api-${Date.now()}`);
+    const archivePath = path.join(tempDir, 'api.zip');
+
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'models'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'controllers'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'routes'), { recursive: true });
+    
+    for (const [filePath, content] of Object.entries(generatedFiles)) {
+      fs.writeFileSync(path.join(tempDir, filePath), content);
+    }
+    
+    const output = fs.createWriteStream(archivePath);
+    const archive = archiver('zip', {
+      zlib: { level: 9 } 
     });
+
+    archive.on('error', function(err) {
+      console.error('Помилка створення архіву:', err);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Помилка створення архіву' 
+      });
+    });
+    
+    output.on('close', function() {
+      console.log('Архів створено, розмір: ' + archive.pointer() + ' байт');
+      
+      const archiveData = fs.readFileSync(archivePath);
+      
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch (error) {
+        console.error('Помилка видалення тимчасових файлів:', error);
+      }
+      
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename=api-${Date.now()}.zip`);
+      return res.send(archiveData);
+    });
+
+    archive.directory(tempDir, false);
+
+    archive.finalize();
   } catch (error) {
     console.error('Помилка генерації API:', error);
     res.status(500).json({ 
@@ -166,8 +216,182 @@ const generateApi = async (req, res) => {
   }
 };
 
+/**
+ * Парсинг JSON схеми для генерації MongoDB моделей
+ * @route POST /api/generator/parse
+ * @access Private
+ */
+const parseJsonSchema = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { schemaId } = req.body;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    const schema = await SchemaFile.findById(schemaId);
+    
+    if (!schema) {
+      return res.status(404).json({
+        success: false,
+        message: 'Схему не знайдено'
+      });
+    }
+    
+    if (schema.userId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    const schemaAnalysis = schema.structure;
+    
+    if (!schemaAnalysis || !schemaAnalysis.tables || schemaAnalysis.tables.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Схема не містить таблиць або має неправильний формат'
+      });
+    }
+    
+    const { subscription = 'free' } = req.user;
+    const tableLimit = subscriptionLimits[subscription] || 3;
+    
+    if (schemaAnalysis.tables.length > tableLimit) {
+      return res.status(403).json({
+        success: false,
+        message: `Ваша підписка дозволяє тільки ${tableLimit} таблиць. Схема містить ${schemaAnalysis.tables.length} таблиць.`,
+        currentLimit: tableLimit,
+        requestedTables: schemaAnalysis.tables.length
+      });
+    }
+    
+    const tables = schemaAnalysis.tables.map(table => ({
+      name: table.name,
+      columnsCount: table.columns.length
+    }));
+    
+    const relations = schemaAnalysis.relations.map(relation => ({
+      sourceTable: relation.sourceTable,
+      targetTable: relation.targetTable,
+      relationType: relation.relationType
+    }));
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Схема успішно проаналізована',
+      schema: {
+        tablesCount: tables.length,
+        tables,
+        relationsCount: relations.length,
+        relations
+      }
+    });
+  } catch (error) {
+    console.error('Помилка аналізу JSON схеми:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Помилка сервера при аналізі схеми' 
+    });
+  }
+};
+
+/**
+ * Попередній перегляд згенерованих файлів
+ * @route POST /api/generator/preview
+ * @access Private
+ */
+const previewGeneratedFiles = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { schemaId, tableNames } = req.body;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    const schema = await SchemaFile.findById(schemaId);
+    
+    if (!schema) {
+      return res.status(404).json({
+        success: false,
+        message: 'Схему не знайдено'
+      });
+    }
+    
+    if (schema.userId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    const schemaAnalysis = schema.structure;
+    
+    if (!schemaAnalysis || !schemaAnalysis.tables || schemaAnalysis.tables.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Схема не містить таблиць або має неправильний формат'
+      });
+    }
+    
+    let tables = schemaAnalysis.tables;
+    if (tableNames && Array.isArray(tableNames) && tableNames.length > 0) {
+      tables = tables.filter(table => tableNames.includes(table.name));
+    }
+    
+    const previewFiles = {};
+    
+    if (tables.length > 0) {
+      const tableName = tables[0].name;
+      previewFiles[`models/${tableName}.js`] = mongoModelGenerator.generateMongooseModel(schemaAnalysis, tableName);
+      previewFiles[`controllers/${tableName}Controller.js`] = mongoModelGenerator.generateController(tableName);
+      previewFiles[`routes/${tableName}Routes.js`] = mongoModelGenerator.generateRoutes(tableName);
+    }
+    
+    previewFiles['server.js'] = mongoModelGenerator.generateServerFile(
+      tables.map(table => table.name)
+    );
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Попередній перегляд файлів згенеровано',
+      files: previewFiles
+    });
+  } catch (error) {
+    console.error('Помилка генерації попереднього перегляду:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Помилка сервера при генерації попереднього перегляду' 
+    });
+  }
+};
+
 module.exports = {
   getSubscriptionInfo,
   validateSubscriptionForSchema,
-  generateApi
+  parseJsonSchema,
+  generateApi,
+  previewGeneratedFiles
 };
