@@ -1,4 +1,3 @@
-// utils/subscriptionLimits.js
 const subscriptionTypes = {
     FREE: 'free',
     BASIC: 'basic',
