@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 const { validationResult } = require('express-validator');
+const fakerDataGenerator = require('../services/fakerDataGenerator');
 
 /**
  * Отримання інформації про підписку користувача
@@ -163,9 +164,10 @@ const generateApi = async (req, res) => {
     
     const generatedFiles = mongoModelGenerator.generateAllFiles(schemaAnalysis);
     
-    const tempDir = path.join(__dirname, '../tmp', `api-${Date.now()}`);
+    const timestamp = Date.now();
+    const tempDir = path.join(__dirname, '../tmp', `api-${timestamp}`);
     const archiveDir = path.join(__dirname, '../tmp', 'archives');
-    const archivePath = path.join(archiveDir, `api-${Date.now()}.zip`);
+    const archivePath = path.join(archiveDir, `api-${timestamp}.zip`);
 
     fs.mkdirSync(tempDir, { recursive: true });
     fs.mkdirSync(archiveDir, { recursive: true });
@@ -174,8 +176,13 @@ const generateApi = async (req, res) => {
     fs.mkdirSync(path.join(tempDir, 'routes'), { recursive: true });
     
     for (const [filePath, content] of Object.entries(generatedFiles)) {
-      fs.writeFileSync(path.join(tempDir, filePath), content);
+      const fullPath = path.join(tempDir, filePath);
+      const dir = path.dirname(fullPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(fullPath, content);
     }
+    
+    console.log(`Згенеровано ${Object.keys(generatedFiles).length} файлів`);
     
     const output = fs.createWriteStream(archivePath);
     const archive = archiver('zip', {
@@ -202,7 +209,7 @@ const generateApi = async (req, res) => {
     });
     
     output.on('close', function() {
-      console.log('Архів створено, розмір: ' + archive.pointer() + ' байт');
+      console.log('Архів створено успішно, розмір: ' + archive.pointer() + ' байт');
       
       fs.readFile(archivePath, (err, archiveData) => {
         if (err) {
@@ -218,14 +225,14 @@ const generateApi = async (req, res) => {
         
         try {
           fs.rmSync(tempDir, { recursive: true, force: true });
-           fs.unlinkSync(archivePath);
+          fs.unlinkSync(archivePath);
         } catch (error) {
           console.error('Помилка видалення тимчасових файлів:', error);
         }
         
         if (!res.headersSent) {
           res.setHeader('Content-Type', 'application/zip');
-          res.setHeader('Content-Disposition', `attachment; filename=api-${Date.now()}.zip`);
+          res.setHeader('Content-Disposition', `attachment; filename=api-project-${timestamp}.zip`);
           res.setHeader('Content-Length', archiveData.length);
           res.send(archiveData);
         }
@@ -235,12 +242,15 @@ const generateApi = async (req, res) => {
     archive.directory(tempDir, false);
 
     archive.finalize();
+    
   } catch (error) {
     console.error('Помилка генерації API:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Помилка сервера при генерації API' 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        success: false,
+        message: 'Помилка сервера при генерації API: ' + error.message
+      });
+    }
   }
 };
 
@@ -416,10 +426,243 @@ const previewGeneratedFiles = async (req, res) => {
   }
 };
 
+/**
+ * Генерація тестових даних для схеми
+ * @route POST /api/generator/generate-data
+ * @access Private
+ */
+const generateTestData = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { schemaId, count = 10, locale = 'uk' } = req.body;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    // Знаходимо схему за ID
+    const schema = await SchemaFile.findById(schemaId);
+    
+    if (!schema) {
+      return res.status(404).json({
+        success: false,
+        message: 'Схему не знайдено'
+      });
+    }
+    
+    if (schema.userId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    // Аналіз схеми
+    const schemaAnalysis = schema.structure;
+    
+    if (!schemaAnalysis || !schemaAnalysis.tables || schemaAnalysis.tables.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Схема не містить таблиць або має неправильний формат'
+      });
+    }
+    
+    fakerDataGenerator.setLocale(locale);
+    
+    const generatedData = fakerDataGenerator.generateDataForAllTables(schemaAnalysis, count);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Тестові дані успішно згенеровано',
+      data: generatedData,
+      metadata: {
+        tablesCount: Object.keys(generatedData).length,
+        recordsPerTable: count,
+        locale: locale
+      }
+    });
+  } catch (error) {
+    console.error('Помилка генерації тестових даних:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Помилка сервера при генерації тестових даних' 
+    });
+  }
+};
+
+/**
+ * Генерація тестових даних для конкретної таблиці
+ * @route POST /api/generator/generate-data/:tableName
+ * @access Private
+ */
+const generateTestDataForTable = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { schemaId, count = 10, locale = 'uk' } = req.body;
+    const { tableName } = req.params;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    if (!tableName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Назва таблиці обов\'язкова'
+      });
+    }
+    
+    const schema = await SchemaFile.findById(schemaId);
+    
+    if (!schema) {
+      return res.status(404).json({
+        success: false,
+        message: 'Схему не знайдено'
+      });
+    }
+    
+    if (schema.userId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    const schemaAnalysis = schema.structure;
+    
+    if (!schemaAnalysis || !schemaAnalysis.tables) {
+      return res.status(400).json({
+        success: false,
+        message: 'Схема не містить таблиць або має неправильний формат'
+      });
+    }
+    
+    const table = schemaAnalysis.tables.find(t => t.name === tableName);
+    
+    if (!table) {
+      return res.status(404).json({
+        success: false,
+        message: `Таблицю '${tableName}' не знайдено в схемі`
+      });
+    }
+    
+    fakerDataGenerator.setLocale(locale);
+    
+    const generatedData = fakerDataGenerator.generateDocuments(table, count);
+    
+    return res.status(200).json({
+      success: true,
+      message: `Тестові дані для таблиці '${tableName}' успішно згенеровано`,
+      tableName: tableName,
+      data: generatedData,
+      metadata: {
+        recordsCount: count,
+        locale: locale
+      }
+    });
+  } catch (error) {
+    console.error('Помилка генерації тестових даних для таблиці:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Помилка сервера при генерації тестових даних' 
+    });
+  }
+};
+
+/**
+ * Генерація скрипту вставки даних
+ * @route POST /api/generator/generate-insert-script
+ * @access Private
+ */
+const generateInsertScript = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { schemaId, count = 10, dbType = 'mongodb', locale = 'uk' } = req.body;
+    
+    if (!schemaId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID схеми обов\'язковий'
+      });
+    }
+    
+    const schema = await SchemaFile.findById(schemaId);
+    
+    if (!schema) {
+      return res.status(404).json({
+        success: false,
+        message: 'Схему не знайдено'
+      });
+    }
+    
+    if (schema.userId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Доступ заборонено'
+      });
+    }
+    
+    const schemaAnalysis = schema.structure;
+    
+    if (!schemaAnalysis || !schemaAnalysis.tables || schemaAnalysis.tables.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Схема не містить таблиць або має неправильний формат'
+      });
+    }
+    
+    fakerDataGenerator.setLocale(locale);
+    
+    const script = fakerDataGenerator.generateInsertScript(schemaAnalysis, dbType, count);
+    
+    const filename = `${dbType}-insert-script-${Date.now()}.${dbType === 'mongodb' ? 'js' : 'sql'}`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(script);
+  } catch (error) {
+    console.error('Помилка генерації скрипту:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Помилка сервера при генерації скрипту' 
+    });
+  }
+};
+
 module.exports = {
   getSubscriptionInfo,
   validateSubscriptionForSchema,
   parseJsonSchema,
   generateApi,
-  previewGeneratedFiles
+  previewGeneratedFiles,
+  generateTestData,
+  generateTestDataForTable,
+  generateInsertScript
 };

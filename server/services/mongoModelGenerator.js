@@ -404,14 +404,171 @@ const generateAllFiles = (schemaAnalysis) => {
     });
     
     files['server.js'] = generateServerFile(modelNames);
+
+    files['.env'] = generateEnvFile();
+    files['package.json'] = generatePackageJson();
+    files['README.md'] = generateReadme(modelNames);
+    files['.gitignore'] = generateGitignore();
     
     return files;
 };
+
+/**
+ * Генерує файл .env з базовою конфігурацією
+ * @returns {String} Вміст .env файлу
+ */
+const generateEnvFile = () => {
+  return `# MongoDB Configuration
+    MONGODB_URI=mongodb://localhost:27017/your-database-name
+    # Alternative for MongoDB Atlas
+    # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database-name?retryWrites=true&w=majority
+
+    # Server Configuration
+    PORT=5000
+
+    # JWT Secret (змініть на свій секретний ключ)
+    JWT_SECRET=your-super-secret-jwt-key-change-this
+
+    # Environment
+    NODE_ENV=development
+    `;
+};
+
+/**
+ * Генерує файл package.json з необхідними залежностями
+ * @param {String} projectName - Назва проекту
+ * @returns {String} Вміст package.json
+ */
+const generatePackageJson = (projectName = 'api-project') => {
+  return JSON.stringify({
+    name: projectName,
+    version: '1.0.0',
+    description: 'Generated REST API for MongoDB',
+    main: 'server.js',
+    scripts: {
+      start: 'node server.js',
+      dev: 'nodemon server.js',
+      test: 'echo \"Error: no test specified\" && exit 1'
+    },
+    keywords: ['api', 'rest', 'mongodb', 'express'],
+    author: '',
+    license: 'ISC',
+    dependencies: {
+      express: '^4.18.2',
+      mongoose: '^8.0.0',
+      cors: '^2.8.5',
+      dotenv: '^16.3.1',
+      'express-validator': '^7.0.1'
+    },
+    devDependencies: {
+      nodemon: '^3.0.1'
+    }
+  }, null, 2);
+};
+
+/**
+ * Генерує README.md файл з інструкціями
+ * @param {Array} modelNames - Масив назв моделей
+ * @returns {String} Вміст README.md
+ */
+const generateReadme = (modelNames) => {
+  return `# Generated REST API
+
+    This REST API was automatically generated and includes the following models:
+    ${modelNames.map(name => `- ${name}`).join('\n')}
+
+    ## Installation
+
+    1. Install dependencies:
+    \`\`\`bash
+    npm install
+    \`\`\`
+
+    2. Configure MongoDB:
+    - Update the \`MONGODB_URI\` in the \`.env\` file with your MongoDB connection string
+
+    3. Start the server:
+    \`\`\`bash
+    npm start
+    \`\`\`
+
+    Or for development with auto-reload:
+    \`\`\`bash
+    npm run dev
+    \`\`\`
+
+    ## API Endpoints
+
+    ${modelNames.map(name => `
+    ### ${name}
+
+    - \`GET /api/${name.toLowerCase()}s\` - Get all ${name.toLowerCase()}s
+    - \`GET /api/${name.toLowerCase()}s/:id\` - Get a specific ${name.toLowerCase()}
+    - \`POST /api/${name.toLowerCase()}s\` - Create a new ${name.toLowerCase()}
+    - \`PUT /api/${name.toLowerCase()}s/:id\` - Update a ${name.toLowerCase()}
+    - \`DELETE /api/${name.toLowerCase()}s/:id\` - Delete a ${name.toLowerCase()}
+    `).join('\n')}
+
+    ## Environment Variables
+
+    - \`MONGODB_URI\` - MongoDB connection string
+    - \`PORT\` - Server port (default: 5000)
+    - \`JWT_SECRET\` - Secret key for JWT tokens (if authentication is implemented)
+
+    ## Project Structure
+
+    \`\`\`
+    .
+    ├── models/          # Mongoose models
+    ├── controllers/     # Route controllers
+    ├── routes/          # API routes
+    ├── .env             # Environment variables
+    ├── server.js        # Server entry point
+    ├── package.json     # Project dependencies
+    └── README.md        # This file
+    \`\`\`
+    `;
+};
+
+/**
+ * Генерує файл .gitignore
+ * @returns {String} Вміст .gitignore
+ */
+const generateGitignore = () => {
+  return `# Dependencies
+    node_modules/
+
+    # Environment variables
+    .env
+
+    # Logs
+    logs
+    *.log
+    npm-debug.log*
+
+    # OS files
+    .DS_Store
+    Thumbs.db
+
+    # IDE files
+    .vscode/
+    .idea/
+
+    # Temporary files
+    tmp/
+    temp/
+    `;
+};
+
 
 module.exports = {
     generateMongooseModel,
     generateController,
     generateRoutes,
     generateServerFile,
-    generateAllFiles
+    generateAllFiles,
+    generateEnvFile,
+    generatePackageJson,
+    generateReadme,
+    generateGitignore
 };

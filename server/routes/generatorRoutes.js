@@ -6,7 +6,10 @@ const {
   validateSubscriptionForSchema, 
   parseJsonSchema,  
   generateApi,
-  previewGeneratedFiles
+  previewGeneratedFiles,
+  generateTestData,
+  generateTestDataForTable,
+  generateInsertScript
 } = require('../controllers/generatorController');
 const { 
   checkSubscription, 
@@ -45,5 +48,27 @@ router.post('/preview', [
   auth,
   check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий')
 ], previewGeneratedFiles);
+
+router.post('/generate-data', [
+  auth, 
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий'),
+  check('count').optional().isInt({ min: 1, max: 1000 }).withMessage('Кількість має бути від 1 до 1000'),
+  check('locale').optional().isString().withMessage('Локаль має бути рядком')
+], generateTestData);
+
+router.post('/generate-data/:tableName', [
+  auth, 
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий'),
+  check('count').optional().isInt({ min: 1, max: 1000 }).withMessage('Кількість має бути від 1 до 1000'),
+  check('locale').optional().isString().withMessage('Локаль має бути рядком')
+], generateTestDataForTable);
+
+router.post('/generate-insert-script', [
+  auth, 
+  check('schemaId').notEmpty().withMessage('ID схеми обов\'язковий'),
+  check('count').optional().isInt({ min: 1, max: 1000 }).withMessage('Кількість має бути від 1 до 1000'),
+  check('dbType').optional().isIn(['mongodb', 'sql']).withMessage('Тип БД має бути mongodb або sql'),
+  check('locale').optional().isString().withMessage('Локаль має бути рядком')
+], generateInsertScript);
 
 module.exports = router;
