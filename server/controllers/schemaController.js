@@ -5,7 +5,7 @@ const schemaAnalyzer = require('../services/schemaAnalyzer');
 const { validationResult } = require('express-validator');
 
 /**
- * Завантаження JSON файлу зі схемою
+ * Upload JSON file with schema
  * @route POST /api/schemas/upload
  * @access Private
  */
@@ -16,37 +16,47 @@ const uploadSchema = async (req,res) => {
             return res.status(400).json({ errors: errors.array() });
         }
 
-        if (!req.file) {
-            return res.status(400).json({ message: 'Будь ласка, завантажте JSON файл' });
+        // Check if it's a file upload or direct JSON data
+        let fileContent, filename;
+        
+        if (req.file) {
+            // Traditional file upload
+            console.log('Uploading file:', req.file); 
+            console.log('File path:', req.file.path);
+
+            if (!fs.existsSync(req.file.path)) {
+                return res.status(400).json({ message: 'File not found after upload' });
+            }
+
+            fileContent = fs.readFileSync(req.file.path, 'utf8');
+            filename = req.file.originalname;
+            
+            // Delete the temporary file
+            fs.unlinkSync(req.file.path);
+        } else if (req.body.content && req.body.filename) {
+            // Direct JSON content from API
+            fileContent = req.body.content;
+            filename = req.body.filename;
+        } else {
+            return res.status(400).json({ message: 'Please provide a JSON file or content' });
         }
-
-        console.log('Uploading file:', req.file); 
-        console.log('File path:', req.file.path);
-
-        if (!fs.existsSync(req.file.path)) {
-            return res.status(400).json({ message: 'Файл не знайдено після завантаження' });
-        }
-
-        const fileContent = fs.readFileSync(req.file.path, 'utf8');
-    
-        fs.unlinkSync(req.file.path);
 
         let jsonContent;
         try {
             jsonContent = JSON.parse(fileContent);
         } catch (error) {
-            return res.status(400).json({ message: 'Некоректний JSON формат' });
+            return res.status(400).json({ message: 'Invalid JSON format' });
         }
 
         if (!isValidSchema(jsonContent)) {
-            return res.status(400).json({ message: 'Некоректна структура JSON-схеми' });
+            return res.status(400).json({ message: 'Invalid JSON-schema structure' });
         }
 
         const schemaAnalysis = await schemaAnalyzer.analyzeSchema(jsonContent);
 
         const newSchema = new SchemaFile({
             userId: req.user.userId, 
-            filename: req.file.originalname,
+            filename: filename,
             content: fileContent,
             structure: schemaAnalysis, 
             uploadedAt: Date.now()
@@ -55,19 +65,19 @@ const uploadSchema = async (req,res) => {
         await newSchema.save();
 
         res.status(201).json({
-            message: 'Схему успішно завантажено',
+            message: 'Schema uploaded successfully',
             schemaId: newSchema._id,
             tables: schemaAnalysis.tables,
             relations: schemaAnalysis.relations
         });
     } catch (error){   
-        console.error('Помилка при завантаженні схеми:', error);
-        res.status(500).json({ message: 'Помилка сервера при завантаженні схеми' });
+        console.error('Error uploading schema:', error);
+        res.status(500).json({ message: 'Server error while uploading schema' });
     }
 };
 
 /**
- * Отримання всіх схем користувача
+ * Get all user schemas
  * @route GET /api/schemas
  * @access Private
  */
@@ -79,13 +89,13 @@ const getSchemas = async (req, res) => {
   
       res.json(schemas);
     } catch (error) {
-      console.error('Помилка при отриманні схем:', error);
-      res.status(500).json({ message: 'Помилка сервера при отриманні схем' });
+      console.error('Error getting schemas:', error);
+      res.status(500).json({ message: 'Server error while getting schemas' });
     }
 };
   
 /**
-* Отримання конкретної схеми за ID
+* Get specific schema by ID
 * @route GET /api/schemas/:id
 * @access Private
 */
@@ -94,22 +104,22 @@ const getSchemaById = async (req, res) => {
       const schema = await SchemaFile.findById(req.params.id);
   
       if (!schema) {
-        return res.status(404).json({ message: 'Схему не знайдено' });
+        return res.status(404).json({ message: 'Schema not found' });
       }
   
       if (schema.userId.toString() !== req.user.userId) {
-        return res.status(403).json({ message: 'Доступ заборонено' });
+        return res.status(403).json({ message: 'Access denied' });
       }
   
       res.json(schema);
     } catch (error) {
-      console.error('Помилка при отриманні схеми:', error);
-      res.status(500).json({ message: 'Помилка сервера при отриманні схеми' });
+      console.error('Error getting schema:', error);
+      res.status(500).json({ message: 'Server error while getting schema' });
     }
 };
   
 /**
-* Видалення схеми
+* Delete schema
 * @route DELETE /api/schemas/:id
 * @access Private
 */
@@ -118,24 +128,24 @@ const deleteSchema = async (req, res) => {
       const schema = await SchemaFile.findById(req.params.id);
   
       if (!schema) {
-        return res.status(404).json({ message: 'Схему не знайдено' });
+        return res.status(404).json({ message: 'Schema not found' });
       }
   
       if (schema.userId.toString() !== req.user.userId) {
-        return res.status(403).json({ message: 'Доступ заборонено' });
+        return res.status(403).json({ message: 'Access denied' });
       }
   
       await schema.deleteOne();
-      res.json({ message: 'Схему успішно видалено' });
+      res.json({ message: 'Schema deleted successfully' });
     } catch (error) {
-      console.error('Помилка при видаленні схеми:', error);
-      res.status(500).json({ message: 'Помилка сервера при видаленні схеми' });
+      console.error('Error deleting schema:', error);
+      res.status(500).json({ message: 'Server error while deleting schema' });
     }
 };
   
 /**
-* Базова перевірка валідності JSON-схеми
-* В реальному проекті варто використовувати спеціалізовані бібліотеки для валідації
+* Basic JSON-schema validation
+* In real project should use specialized libraries for validation
 */
 const isValidSchema = (schema) => {
     try {

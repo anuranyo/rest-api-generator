@@ -1,7 +1,7 @@
 /**
-* Основна функція аналізу схеми
-* @param {Object} schema - JSON схема для аналізу
-* @returns {Object} Результати аналізу з таблицями та зв'язками
+* Main schema analysis function
+* @param {Object} schema - JSON schema to analyze
+* @returns {Object} Analysis results with tables and relations
 */
 const analyzeSchema = async (schema) => {
     try {
@@ -16,19 +16,30 @@ const analyzeSchema = async (schema) => {
         result.tables = extractTablesFromObject(schema);
       }
   
-      result.relations = detectRelations(result.tables, schema);
+      // Extract relationships from the schema.relationships array if it exists
+      if (schema.relationships) {
+        result.relations = schema.relationships.map(rel => ({
+          sourceTable: rel.source.table,
+          targetTable: rel.target.table,
+          sourceColumn: rel.source.column,
+          targetColumn: rel.target.column,
+          relationType: rel.type
+        }));
+      } else {
+        result.relations = detectRelations(result.tables, schema);
+      }
   
       return result;
     } catch (error) {
-      console.error('Помилка аналізу схеми:', error);
-      throw new Error('Помилка під час аналізу JSON-схеми');
+      console.error('Schema analysis error:', error);
+      throw new Error('Error during JSON schema analysis');
     }
 };
   
 /**
-* Витягує інформацію про таблиці з масиву
-* @param {Array} tables - Масив таблиць
-* @returns {Array} Структуровані дані таблиць
+* Extract table information from array
+* @param {Array} tables - Array of tables
+* @returns {Array} Structured table data
 */
 const extractTablesFromArray = (tables) => {
     return tables.map(table => {
@@ -44,7 +55,11 @@ const extractTablesFromArray = (tables) => {
           isPrimary: column.constraints?.primaryKey || false,
           isNullable: column.constraints?.nullable !== false,
           isUnique: column.constraints?.unique || false,
-          defaultValue: column.defaultValue
+          defaultValue: column.defaultValue,
+          // Preserve faker information
+          faker: column.faker || null,
+          // Preserve the original type if it's a faker type
+          fakerType: column.faker ? `${column.faker.category}.${column.faker.type}` : null
         }));
       }
   
@@ -53,9 +68,9 @@ const extractTablesFromArray = (tables) => {
 };
   
 /**
-* Витягує інформацію про таблиці з об'єкта
-* @param {Object} schema - JSON схема
-* @returns {Array} Структуровані дані таблиць
+* Extract table information from object
+* @param {Object} schema - JSON schema
+* @returns {Array} Structured table data
 */
 const extractTablesFromObject = (schema) => {
     const tables = [];
@@ -85,9 +100,9 @@ const extractTablesFromObject = (schema) => {
 };
   
 /**
-* Обробляє масив колонок
-* @param {Array} columns - Масив колонок
-* @returns {Array} Структуровані дані колонок
+* Process columns array
+* @param {Array} columns - Array of columns
+* @returns {Array} Structured column data
 */
 const processColumns = (columns) => {
     if (!Array.isArray(columns)) return [];
@@ -98,14 +113,17 @@ const processColumns = (columns) => {
       isPrimary: column.primaryKey || column.primary || false,
       isNullable: column.nullable !== false,
       isUnique: column.unique || false,
-      defaultValue: column.default || column.defaultValue
+      defaultValue: column.default || column.defaultValue,
+      // Preserve faker information
+      faker: column.faker || null,
+      fakerType: column.faker ? `${column.faker.category}.${column.faker.type}` : null
     }));
 };
   
 /**
-* Обробляє об'єкт полів
-* @param {Object} fields - Об'єкт з полями
-* @returns {Array} Структуровані дані колонок
+* Process fields object
+* @param {Object} fields - Object with fields
+* @returns {Array} Structured column data
 */
 const processFields = (fields) => {
     const columns = [];
@@ -117,7 +135,10 @@ const processFields = (fields) => {
         isPrimary: fieldInfo.primaryKey || fieldInfo.primary || false,
         isNullable: fieldInfo.nullable !== false,
         isUnique: fieldInfo.unique || false,
-        defaultValue: fieldInfo.default || fieldInfo.defaultValue
+        defaultValue: fieldInfo.default || fieldInfo.defaultValue,
+        // Preserve faker information if it exists
+        faker: fieldInfo.faker || null,
+        fakerType: fieldInfo.faker ? `${fieldInfo.faker.category}.${fieldInfo.faker.type}` : null
       });
     }
   
@@ -125,9 +146,9 @@ const processFields = (fields) => {
 };
   
 /**
-* Обробляє загальний об'єкт як набір колонок
-* @param {Object} obj - Об'єкт для обробки
-* @returns {Array} Структуровані дані колонок
+* Process generic object as column set
+* @param {Object} obj - Object to process
+* @returns {Array} Structured column data
 */
 const processGenericObject = (obj) => {
     const columns = [];
@@ -140,7 +161,9 @@ const processGenericObject = (obj) => {
         type: 'string', 
         isPrimary: false,
         isNullable: true,
-        isUnique: false
+        isUnique: false,
+        faker: null,
+        fakerType: null
       };
   
       if (typeof value === 'string') {
@@ -152,6 +175,9 @@ const processGenericObject = (obj) => {
         columnInfo.isNullable = value.nullable !== false;
         columnInfo.isUnique = value.unique || false;
         columnInfo.defaultValue = value.default || value.defaultValue;
+        // Preserve faker information
+        columnInfo.faker = value.faker || null;
+        columnInfo.fakerType = value.faker ? `${value.faker.category}.${value.faker.type}` : null;
       }
   
       columns.push(columnInfo);
@@ -161,10 +187,10 @@ const processGenericObject = (obj) => {
 };
   
 /**
-* Виявляє зв'язки між таблицями на основі конвенцій іменування та структури
-* @param {Array} tables - Таблиці
-* @param {Object} schema - Оригінальна схема
-* @returns {Array} Виявлені зв'язки
+* Detect relations between tables based on naming conventions and structure
+* @param {Array} tables - Tables
+* @param {Object} schema - Original schema
+* @returns {Array} Detected relations
 */
 const detectRelations = (tables, schema) => {
     const relations = [];
@@ -213,9 +239,9 @@ const detectRelations = (tables, schema) => {
 };
   
 /**
-* Перетворює типи даних з JSON-схеми у стандартні типи БД
-* @param {string} type - Тип даних з JSON-схеми
-* @returns {string} Стандартизований тип даних
+* Convert data types from JSON schema to standard DB types
+* @param {string} type - Data type from JSON schema
+* @returns {string} Standardized data type
 */
 const mapDataType = (type) => {
     if (!type) return 'string';

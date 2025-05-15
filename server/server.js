@@ -10,7 +10,7 @@ const app = express();
 
 app.use(cors({
   origin: function(origin, callback) {
-    const allowedOrigins = ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5173'];
+    const allowedOrigins = ['https://restapigenerator.space', 'https://www.restapigenerator.space', 'http://localhost:3000', 'http://localhost:5174'];
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {

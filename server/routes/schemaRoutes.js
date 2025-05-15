@@ -25,7 +25,7 @@ const fileFilter = (req, file, cb) => {
     if (file.mimetype === 'application/json' || path.extname(file.originalname) === '.json') {
         cb(null, true);
     } else {
-        cb(new Error('Підтримуються тільки JSON файли'), false)
+        cb(new Error('Only JSON files supported'), false)
     }
 };
 
@@ -39,17 +39,26 @@ const upload = multer({
 
 /**
  * @route   POST /api/schemas/upload
- * @desc    Завантаження нової схеми JSON
+ * @desc    Upload new JSON schema (file or direct JSON)
  * @access  Private
  */
 router.post(
     '/upload',
     auth,
-    upload.single('schema'),
+    (req, res, next) => {
+      // Check if request has JSON content in body
+      if (req.is('application/json') && req.body.content) {
+        // Direct JSON upload, skip multer
+        return next();
+      }
+      // Otherwise, use multer for file upload
+      upload.single('schema')(req, res, next);
+    },
     [
-      check('schema').custom((value, { req }) => {
-        if (!req.file) {
-          throw new Error('Файл схеми обов\'язковий');
+      check('').custom((value, { req }) => {
+        // Check for either file upload or direct JSON content
+        if (!req.file && (!req.body.content || !req.body.filename)) {
+          throw new Error('Schema file or content required');
         }
         return true;
       })
@@ -59,21 +68,21 @@ router.post(
 
 /**
  * @route   GET /api/schemas
- * @desc    Отримання списку схем JSON
+ * @desc    Get list of JSON schemas
  * @access  Private
  */
 router.get('/', auth, schemaController.getSchemas);
 
 /**
- * @route   GET /api/schemas
- * @desc    Отримання конкретної схеми JSON
+ * @route   GET /api/schemas/:id
+ * @desc    Get specific JSON schema
  * @access  Private
  */
 router.get('/:id', auth, schemaController.getSchemaById);
 
 /**
  * @route   DELETE /api/schemas/:id
- * @desc    Видалення схеми
+ * @desc    Delete schema
  * @access  Private
  */
 router.delete('/:id', auth, schemaController.deleteSchema);

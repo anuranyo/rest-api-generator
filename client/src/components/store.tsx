@@ -52,6 +52,7 @@ interface DiagramState {
   updateTableName: (tableId: string, newName: string) => void;
   updateRelationship: (relationshipId: string, updates: Partial<Relationship>) => void;
   deleteRelationship: (relationshipId: string) => void;
+  clearStore: () => void;
 }
 
 // Helper function to generate UUIDs
@@ -238,6 +239,13 @@ export const useStore = create<DiagramState>((set, get) => ({
   deleteRelationship: (relationshipId) => {
     set((state) => ({
       relationships: state.relationships.filter((rel) => rel.id !== relationshipId),
+    }));
+  },
+
+  clearStore: () => {
+    set(() => ({
+      tables: [],
+      relationships: [],
     }));
   },
 }));

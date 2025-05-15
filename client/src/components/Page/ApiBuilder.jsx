@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import DBSchema from '../Form/DBSchema';
 import { useStore } from '../store';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'react-hot-toast';
 
 import Header from '../Landing/Header';
 
@@ -10,6 +12,12 @@ const ApiBuilder = () => {
   const [jsonSchema, setJsonSchema] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [projectId, setProjectId] = useState(null);
+  const [projectData, setProjectData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const tables = useStore((state) => state.tables);
   const relationships = useStore((state) => state.relationships);
@@ -17,10 +25,74 @@ const ApiBuilder = () => {
   const addColumn = useStore((state) => state.addColumn);
   const updateColumn = useStore((state) => state.updateColumn);
   const addRelationship = useStore((state) => state.addRelationship);
+  const clearStore = useStore((state) => state.clearStore);
 
   const schemaRef = useRef(null); // useRef to hold the schema reference
 
-  // Определяем, показывать ли Import панель (показываем только если нет таблиц)
+  // Get project ID from URL params
+  useEffect(() => {
+    const projectIdParam = searchParams.get('projectId');
+    if (projectIdParam) {
+      setProjectId(projectIdParam);
+      fetchProjectData(projectIdParam);
+    }
+  }, [searchParams]);
+
+  // Fetch project data and load existing schema if available
+  const fetchProjectData = async (projectId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/projects/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch project');
+      }
+
+      const project = await response.json();
+      setProjectData(project);
+
+      // If project has a schema, load it
+      if (project.schemaId) {
+        const clearCurrentStore = useStore.getState().clearStore;
+        clearCurrentStore(); // Clear existing data
+        
+        console.log('Loading schema from project:', project.schemaId);
+        
+        // Parse the content to get the original schema
+        if (project.schemaId.content) {
+          try {
+            const parsedSchema = JSON.parse(project.schemaId.content);
+            console.log('Parsed schema from content:', parsedSchema);
+            processImportedSchema(parsedSchema);
+          } catch (error) {
+            console.error('Error parsing schema content:', error);
+            toast.error('Failed to parse schema content');
+          }
+        } else if (project.schemaId.structure) {
+          // Fallback: if no content, try structure (but it may not have full schema)
+          console.log('No content found, trying structure:', project.schemaId.structure);
+          processImportedSchema(project.schemaId.structure);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      toast.error('Failed to load project data');
+    }
+  };
+
+  // Add debugging effect to watch store changes
+  useEffect(() => {
+    console.log('Store state changed:');
+    console.log('Tables:', tables.length);
+    console.log('Relationships:', relationships.length);
+    console.log('Actual relationships:', relationships);
+  }, [tables, relationships]);
+
+  // Show Import panel only if there are no tables
   const showImportPanel = tables.length === 0;
 
   useEffect(() => {
@@ -90,6 +162,67 @@ const ApiBuilder = () => {
     }
   }, [tables, relationships]);
 
+  // Save schema to backend
+  const saveSchema = async () => {
+    if (!projectId || !jsonSchema) {
+      toast.error('No project or schema to save');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // First, upload the schema file
+      const schemaResponse = await fetch('/api/schemas/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: JSON.stringify(jsonSchema),
+          filename: `${projectData?.name || 'project'}_schema.json`,
+        }),
+      });
+
+      if (!schemaResponse.ok) {
+        throw new Error('Failed to upload schema');
+      }
+
+      const schemaData = await schemaResponse.json();
+      
+      // Update project with schema ID
+      const updateResponse = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          schemaId: schemaData.schemaId,
+          name: projectData.name,
+          apiPrefix: projectData.apiPrefix,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update project');
+      }
+
+      toast.success('Schema saved successfully');
+      
+      // Navigate to project view page
+      navigate(`/projects/${projectId}/view`);
+      
+    } catch (error) {
+      console.error('Error saving schema:', error);
+      toast.error('Failed to save schema');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDragEnter = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -126,6 +259,9 @@ const ApiBuilder = () => {
       const columnMap = new Map();
       const addedRelationships = new Set();
 
+      // First pass: Add all columns to tables
+      const columnAddPromises = [];
+      
       schema.tables.forEach((tableSchema) => {
         const tableId = tableMap.get(tableSchema.name);
         if (!tableId) return;
@@ -140,20 +276,18 @@ const ApiBuilder = () => {
             // Default faker values if not provided
             const fakerCategory = colSchema.faker?.category || 'name';
             const fakerType = colSchema.faker?.type || 'fullName';
-            const useFaker = colSchema.faker?.active !== false; // Default to true if not specified
+            const useFaker = colSchema.faker?.active !== false;
 
             const isPrimaryKeyId = colSchema.name === 'id' && colSchema.constraints?.primaryKey;
-            let columnId;
 
             if (isPrimaryKeyId) {
-              // Access tables DIRECTLY from Zustand state here:
+              // Update existing ID column
               const currentTables = useStore.getState().tables;
               const table = currentTables.find(t => t.id === tableId);
               if (table) {
                 const defaultColumn = table.columns.find(c => c.name === 'id');
                 if (defaultColumn) {
-                  columnId = defaultColumn.id;
-                  updateColumn(tableId, columnId, {
+                  updateColumn(tableId, defaultColumn.id, {
                     isPrimaryKey: true,
                     isForeignKey: !!colSchema.references,
                     isNullable: !!colSchema.constraints?.nullable,
@@ -162,47 +296,63 @@ const ApiBuilder = () => {
                     fakerCategory: fakerCategory,
                     fakerType: fakerType
                   });
-                  console.log(`Updated default column "id" in table "${tableSchema.name}" with constraints. Column ID: ${columnId}`);
                 }
               }
             } else {
-              columnId = uuidv4();
-              // Use the new column structure with Faker.js
+              // Add new column
               addColumn(tableId, colSchema.name, fakerCategory, fakerType);
-              console.log(`addColumn called for column "${colSchema.name}" in table "${tableSchema.name}". New Column ID: ${columnId}`);
-              updateColumn(tableId, columnId, {
-                isPrimaryKey: !!colSchema.constraints?.primaryKey,
-                isForeignKey: !!colSchema.constraints?.foreignKey || !!colSchema.references,
-                isNullable: !!colSchema.constraints?.nullable,
-                isUnique: !!colSchema.constraints?.unique,
-                useFaker: useFaker,
-                fakerCategory: fakerCategory,
-                fakerType: fakerType
-              });
-            }
-
-            if (columnId) {
-              const columnMapKey = `${tableSchema.name}.${colSchema.name}`;
-              columnMap.set(columnMapKey, columnId);
-              console.log(`Column ID "${columnId}" mapped for "${columnMapKey}"`);
-            } else {
-              console.log(`columnId is NOT set for column "${colSchema.name}" in table "${tableSchema.name}"`);
             }
           });
         }
       });
 
+      // Wait for all columns to be added and then map them by name
       setTimeout(() => {
-        console.log("Table Map (before relationships):", tableMap);
-        console.log("Column Map (before relationships):", columnMap);
+        // Build column map based on actual columns in store
+        const currentTables = useStore.getState().tables;
+        
+        schema.tables.forEach((tableSchema) => {
+          const tableId = tableMap.get(tableSchema.name);
+          if (!tableId) return;
+          
+          const table = currentTables.find(t => t.id === tableId);
+          if (!table) return;
+          
+          // Update column properties based on schema
+          tableSchema.columns.forEach(colSchema => {
+            const column = table.columns.find(c => c.name === colSchema.name);
+            if (column) {
+              // Map column by table name and column name
+              const columnMapKey = `${tableSchema.name}.${colSchema.name}`;
+              columnMap.set(columnMapKey, column.id);
+              console.log(`Mapped column: ${columnMapKey} -> ${column.id}`);
+              
+              // Update column properties
+              updateColumn(tableId, column.id, {
+                isPrimaryKey: !!colSchema.constraints?.primaryKey,
+                isForeignKey: !!colSchema.references || !!colSchema.constraints?.foreignKey,
+                isNullable: colSchema.constraints?.nullable !== false,
+                isUnique: !!colSchema.constraints?.unique,
+                useFaker: colSchema.faker?.active !== false,
+                fakerCategory: colSchema.faker?.category || column.fakerCategory,
+                fakerType: colSchema.faker?.type || column.fakerType
+              });
+            }
+          });
+        });
 
-        // Third pass: Create relationships from the explicit relationships array
+        console.log("Column Map after mapping:", columnMap);
+
+        // Now process relationships with the correct column IDs
         if (schema.relationships && Array.isArray(schema.relationships)) {
-          schema.relationships.forEach(relSchema => {
-            console.log("Processing relationship from schema:", relSchema);
+          console.log(`Processing ${schema.relationships.length} relationships from schema`);
+          
+          schema.relationships.forEach((relSchema, index) => {
+            console.log(`Processing relationship ${index + 1}:`, relSchema);
+            
             if (!relSchema.source?.table || !relSchema.source?.column ||
-              !relSchema.target?.table || !relSchema.target?.column) {
-              console.warn('Skipping invalid relationship', relSchema);
+                !relSchema.target?.table || !relSchema.target?.column) {
+              console.warn('Invalid relationship structure:', relSchema);
               return;
             }
 
@@ -210,30 +360,34 @@ const ApiBuilder = () => {
             const targetTableId = tableMap.get(relSchema.target.table);
 
             if (!sourceTableId || !targetTableId) {
-              console.warn('Could not find table for relationship', relSchema);
+              console.warn('Tables not found for relationship:', relSchema);
+              console.warn('Source table:', relSchema.source.table, '-> ID:', sourceTableId);
+              console.warn('Target table:', relSchema.target.table, '-> ID:', targetTableId);
+              console.warn('Available tables:', Array.from(tableMap.keys()));
               return;
             }
 
-            const sourceColumnMapKey = `${relSchema.source.table}.${relSchema.source.column}`;
-            const targetColumnMapKey = `${relSchema.target.table}.${relSchema.target.column}`;
-
-            const sourceColumnId = columnMap.get(sourceColumnMapKey);
-            const targetColumnId = columnMap.get(targetColumnMapKey);
+            // Get column IDs by name
+            const sourceColumnKey = `${relSchema.source.table}.${relSchema.source.column}`;
+            const targetColumnKey = `${relSchema.target.table}.${relSchema.target.column}`;
+            
+            const sourceColumnId = columnMap.get(sourceColumnKey);
+            const targetColumnId = columnMap.get(targetColumnKey);
 
             if (!sourceColumnId || !targetColumnId) {
-              console.warn('Could not find columns for relationship', relSchema);
+              console.warn(`Columns not found for relationship ${index + 1}`);
+              console.warn(`Source: ${sourceColumnKey} -> ${sourceColumnId}`);
+              console.warn(`Target: ${targetColumnKey} -> ${targetColumnId}`);
+              console.warn('Available columns:', Array.from(columnMap.keys()));
               return;
             }
-            console.log(`Source Table ID: ${sourceTableId}, Source Column ID: ${sourceColumnId}`);
-            console.log(`Target Table ID: ${targetTableId}, Target Column ID: ${targetColumnId}`);
-
 
             const relationshipKey = `${sourceTableId}:${sourceColumnId}-${targetTableId}:${targetColumnId}`;
             const reverseRelationshipKey = `${targetTableId}:${targetColumnId}-${sourceTableId}:${sourceColumnId}`;
 
             if (!addedRelationships.has(relationshipKey) && !addedRelationships.has(reverseRelationshipKey)) {
               const relationshipToAdd = {
-                id: relSchema.id,
+                id: uuidv4(), // Always generate new ID for relationship
                 sourceTableId: sourceTableId,
                 sourceColumnId: sourceColumnId,
                 targetTableId: targetTableId,
@@ -242,103 +396,40 @@ const ApiBuilder = () => {
                 sourceCardinality: relSchema.sourceCardinality || 'one',
                 targetCardinality: relSchema.targetCardinality || 'many'
               };
-              console.log("Adding relationship:", relationshipToAdd);
+              
+              console.log(`Adding relationship ${index + 1} with new IDs:`, relationshipToAdd);
               addRelationship(relationshipToAdd);
-              console.log("Relationship added to store.");
               addedRelationships.add(relationshipKey);
+              console.log(`Relationship ${index + 1} added successfully`);
 
-              if (relSchema.type === 'one-to-one' || relSchema.type === 'one-to-many') {
-                updateColumn(sourceTableId, sourceColumnId, {
-                  isForeignKey: true
-                });
-              } else if (relSchema.type === 'many-to-many') {
-                updateColumn(sourceTableId, sourceColumnId, {
-                  isForeignKey: true
-                });
-                updateColumn(targetTableId, targetColumnId, {
-                  isForeignKey: true
-                });
+              // Mark columns as foreign keys
+              updateColumn(sourceTableId, sourceColumnId, { isForeignKey: true });
+              
+              if (relSchema.type === 'one-to-one' || relSchema.type === 'many-to-many') {
+                updateColumn(targetTableId, targetColumnId, { isForeignKey: true });
               }
+            } else {
+              console.log(`Relationship ${index + 1} already exists (or reverse exists)`);
             }
           });
+        } else {
+          console.warn('No relationships array found in schema or it is empty');
         }
 
-        // Fourth pass: Create relationships from column references
-        schema.tables.forEach(tableSchema => {
-          const tableId = tableMap.get(tableSchema.name);
-          if (!tableId) return;
-
-          if (tableSchema.columns && Array.isArray(tableSchema.columns)) {
-            tableSchema.columns.forEach(colSchema => {
-              if (colSchema.references) {
-                const sourceColumnMapKey = `${tableSchema.name}.${colSchema.name}`;
-                const sourceColumnId = columnMap.get(sourceColumnMapKey);
-
-                const targetTableId = tableMap.get(colSchema.references.table);
-                const targetColumnMapKey = `${colSchema.references.table}.${colSchema.references.column}`;
-                const targetColumnId = columnMap.get(targetColumnMapKey);
-
-                if (sourceColumnId && targetTableId && targetColumnId) {
-                  const relationshipKey = `${tableId}:${sourceColumnId}-${targetTableId}:${targetColumnId}`;
-                  const reverseRelationshipKey = `${targetTableId}:${targetColumnId}-${tableId}:${sourceColumnId}`;
-
-                  if (!addedRelationships.has(relationshipKey) && !addedRelationships.has(reverseRelationshipKey)) {
-                    // Parse relationship type to determine cardinality
-                    let sourceCardinality = 'one';
-                    let targetCardinality = 'many';
-                    
-                    if (colSchema.references.relationship === 'one-to-one') {
-                      sourceCardinality = 'one';
-                      targetCardinality = 'one';
-                    } else if (colSchema.references.relationship === 'many-to-many') {
-                      sourceCardinality = 'many';
-                      targetCardinality = 'many';
-                    } else if (colSchema.references.relationship === 'many-to-one') {
-                      sourceCardinality = 'many';
-                      targetCardinality = 'one';
-                    }
-                    
-                    const relationshipToAdd = {
-                      sourceTableId: tableId,
-                      sourceColumnId: sourceColumnId,
-                      targetTableId: targetTableId,
-                      targetColumnId: targetColumnId,
-                      type: colSchema.references.relationship || 'one-to-many',
-                      sourceCardinality,
-                      targetCardinality
-                    };
-                    console.log("Adding relationship from references:", relationshipToAdd);
-                    addRelationship(relationshipToAdd);
-                    console.log("Relationship from references added to store.");
-                    addedRelationships.add(relationshipKey);
-
-                    updateColumn(tableId, sourceColumnId, {
-                      isForeignKey: true
-                    });
-
-                    if (colSchema.references.relationship === 'many-to-many' ||
-                      colSchema.references.relationship === 'one-to-one') {
-                      updateColumn(targetTableId, targetColumnId, {
-                        isForeignKey: true
-                      });
-                    }
-                  }
-                }
-              }
-            });
-          }
-        });
-
-
-        console.log("Final Relationships State:", useStore.getState().relationships);
+        console.log("Final state - Tables:", useStore.getState().tables);
+        console.log("Final state - Relationships:", useStore.getState().relationships);
+        
         resolve({ columnMap, addedRelationships });
-      }, 300);
+      }, 500); // Wait for columns to be added to store
     });
   };
 
   const processImportedSchema = (schema) => {
     setImportSuccess(false);
     schemaRef.current = schema; // Store schema in ref
+    
+    console.log('Processing imported schema:', schema);
+    console.log('Schema has relationships:', schema.relationships?.length || 0);
 
     processSchemaTables(schema)
       .then((tableMap) => {
@@ -381,7 +472,7 @@ const ApiBuilder = () => {
 
   return (
     <div className="bg-gray-50 flex flex-col h-screen">
-      <Header title="API Builder" />
+      <Header title={projectData ? `API Builder - ${projectData.name}` : "API Builder"} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-gray-50 mt-16 h-screen">
         {/* Left Side: Schema Graph Sandbox */}
@@ -391,7 +482,24 @@ const ApiBuilder = () => {
 
         {/* Right Side: JSON Import + Output */}
         <div className="bg-white shadow rounded-2xl p-6 transition-colors duration-200 relative">
-          {/* Панель импорта JSON (видима только если нет таблиц) */}
+          {/* Save button for project schemas */}
+          {projectId && jsonSchema && tables.length > 0 && (
+            <div className="absolute top-4 right-4 z-10">
+              <button
+                onClick={saveSchema}
+                disabled={loading}
+                className={`px-4 py-2 rounded text-white font-medium transition-colors ${
+                  loading 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {loading ? 'Saving...' : 'Save Schema'}
+              </button>
+            </div>
+          )}
+
+          {/* Import panel (visible only if no tables) */}
           {showImportPanel ? (
             <div
               onDrop={handleFileDrop}
@@ -419,7 +527,7 @@ const ApiBuilder = () => {
             </div>
           ) : null}
 
-          {/* Отображение JSON (всегда видимо) */}
+          {/* Display JSON (always visible) */}
           <div className={`${showImportPanel ? 'invisible' : 'visible'}`}>
             <h4 className="text-sm font-semibold text-gray-700 mb-2">Current JSON Schema</h4>
             {jsonSchema ? (

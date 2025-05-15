@@ -1,10 +1,10 @@
 const { faker } = require('@faker-js/faker');
 
 /**
- * Генерує дані відповідно до типу поля
- * @param {String} dataType - Тип даних
- * @param {String} fieldName - Назва поля (може вплинути на вибір генератора)
- * @returns {*} Згенеровані дані
+ * Generate data according to field type
+ * @param {String} dataType - Data type
+ * @param {String} fieldName - Field name (can influence generator choice)
+ * @returns {*} Generated data
  */
 const generateDataByType = (dataType, fieldName = '') => {
   const lowerFieldName = fieldName.toLowerCase();
@@ -110,46 +110,58 @@ const generateDataByType = (dataType, fieldName = '') => {
 };
 
 /**
- * Генерує дані для Faker типів (person.fullName, internet.email тощо)
- * @param {String} fakerType - Faker тип у форматі "category.method"
- * @returns {*} Згенеровані дані
+ * Generate data for Faker types (person.fullName, internet.email etc)
+ * @param {String} fakerType - Faker type in format "category.method"
+ * @returns {*} Generated data
  */
 const generateDataByFakerType = (fakerType) => {
   try {
     const [category, method] = fakerType.split('.');
     
     if (!category || !method) {
-      console.warn(`Невірний формат Faker типу: ${fakerType}`);
+      console.warn(`Invalid Faker type format: ${fakerType}`);
       return faker.lorem.word();
     }
     
     if (faker[category] && typeof faker[category][method] === 'function') {
       return faker[category][method]();
     } else {
-      console.warn(`Faker метод не знайдено: ${fakerType}`);
+      console.warn(`Faker method not found: ${fakerType}`);
       return faker.lorem.word();
     }
   } catch (error) {
-    console.error(`Помилка генерації даних для типу ${fakerType}:`, error);
+    console.error(`Error generating data for type ${fakerType}:`, error);
     return faker.lorem.word();
   }
 };
 
 /**
- * Генерує один документ на основі структури колекції
- * @param {Object} tableStructure - Структура таблиці/колекції
- * @returns {Object} Згенерований документ
+ * Generate single document based on collection structure
+ * @param {Object} tableStructure - Table/collection structure
+ * @returns {Object} Generated document
  */
 const generateSingleDocument = (tableStructure) => {
   const document = {};
   
   for (const column of tableStructure.columns) {
-    if (column.name === '_id' || column.name === 'id') continue;
+    // Skip certain fields
+    if (column.name === '_id') continue;
     if (column.name === 'createdAt' || column.name === 'updatedAt') continue;
     
-    if (column.type && column.type.includes('.')) {
+    // Use faker configuration if available
+    if (column.faker && column.faker.active !== false) {
+      const fakerType = `${column.faker.category}.${column.faker.type}`;
+      document[column.name] = generateDataByFakerType(fakerType);
+    } 
+    // Use fakerType if it's directly provided
+    else if (column.fakerType) {
+      document[column.name] = generateDataByFakerType(column.fakerType);
+    }
+    // Fall back to type-based generation
+    else if (column.type && column.type.includes('.')) {
       document[column.name] = generateDataByFakerType(column.type);
-    } else {
+    } 
+    else {
       document[column.name] = generateDataByType(column.type, column.name);
     }
   }
@@ -158,10 +170,10 @@ const generateSingleDocument = (tableStructure) => {
 };
 
 /**
- * Генерує масив документів для колекції
- * @param {Object} tableStructure - Структура таблиці/колекції
- * @param {Number} count - Кількість документів для генерації
- * @returns {Array} Масив згенерованих документів
+ * Generate array of documents for collection
+ * @param {Object} tableStructure - Table/collection structure
+ * @param {Number} count - Number of documents to generate
+ * @returns {Array} Array of generated documents
  */
 const generateDocuments = (tableStructure, count = 10) => {
   const documents = [];
@@ -174,10 +186,10 @@ const generateDocuments = (tableStructure, count = 10) => {
 };
 
 /**
- * Генерує дані для всіх таблиць в схемі
- * @param {Object} schemaAnalysis - Результат аналізу схеми
- * @param {Number} countPerTable - Кількість документів на таблицю
- * @returns {Object} Об'єкт з даними для кожної таблиці
+ * Generate data for all tables in schema
+ * @param {Object} schemaAnalysis - Schema analysis result
+ * @param {Number} countPerTable - Number of documents per table
+ * @returns {Object} Object with data for each table
  */
 const generateDataForAllTables = (schemaAnalysis, countPerTable = 10) => {
   const data = {};
@@ -190,11 +202,11 @@ const generateDataForAllTables = (schemaAnalysis, countPerTable = 10) => {
 };
 
 /**
- * Генерує SQL або MongoDB скрипт для вставки даних
- * @param {Object} schemaAnalysis - Результат аналізу схеми
- * @param {String} dbType - Тип бази даних (mongodb/sql)
- * @param {Number} countPerTable - Кількість записів на таблицю
- * @returns {String} Скрипт для вставки даних
+ * Generate SQL or MongoDB script for data insertion
+ * @param {Object} schemaAnalysis - Schema analysis result
+ * @param {String} dbType - Database type (mongodb/sql)
+ * @param {Number} countPerTable - Number of records per table
+ * @returns {String} Data insertion script
  */
 const generateInsertScript = (schemaAnalysis, dbType = 'mongodb', countPerTable = 10) => {
   const data = generateDataForAllTables(schemaAnalysis, countPerTable);
@@ -238,8 +250,8 @@ const generateInsertScript = (schemaAnalysis, dbType = 'mongodb', countPerTable 
 };
 
 /**
- * Налаштування мови генерації даних
- * @param {String} locale - Код мови (uk, en, de тощо)
+ * Set data generation language
+ * @param {String} locale - Language code (uk, en, de etc)
  */
 const setLocale = (locale = 'en') => {
   faker.locale = locale;

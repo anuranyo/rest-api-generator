@@ -17,14 +17,11 @@ export default defineConfig({
     'process.env': process.env,
   },
   server: {
-    // Enable CORS if needed
-    cors: true,
-    // Configure proxy if needed
-    // proxy: {
-    //   '/api': {
-    //     target: 'https://rest-api-generator-serv.vercel.app',
-    //     changeOrigin: true,
-    //   },
-    // },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
 });
