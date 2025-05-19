@@ -2,9 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 const createDirectories = () => {
+  const _dirname = path.dirname(__filename);
+  
   const directories = [
-    path.join(__dirname, 'tmp', 'uploads'),
-    path.join(__dirname, 'tmp', 'generated'),
+    path.join(_dirname, '..', 'tmp', 'uploads'),
+    path.join(_dirname, '..', 'tmp', 'generated'),
+    path.join(_dirname, '..', 'tmp', 'archives'),
   ];
   
   directories.forEach(dir => {
@@ -16,3 +19,7 @@ const createDirectories = () => {
 };
 
 createDirectories();
+
+module.exports = {
+  createDirectories
+};

@@ -10,10 +10,14 @@ const auth = require('../middleware/auth');
 const uploadsDir = path.join(__dirname, '../tmp/uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log(`Створено директорію для завантажень: ${uploadsDir}`);
 }
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
         cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {

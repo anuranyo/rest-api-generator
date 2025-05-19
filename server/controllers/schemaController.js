@@ -9,20 +9,24 @@ const { validationResult } = require('express-validator');
  * @route POST /api/schemas/upload
  * @access Private
  */
-const uploadSchema = async (req,res) => {
+const uploadSchema = async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()){
             return res.status(400).json({ errors: errors.array() });
         }
 
-        // Check if it's a file upload or direct JSON data
         let fileContent, filename;
         
         if (req.file) {
-            // Traditional file upload
             console.log('Uploading file:', req.file); 
             console.log('File path:', req.file.path);
+
+            const fileDir = path.dirname(req.file.path);
+            if (!fs.existsSync(fileDir)) {
+                fs.mkdirSync(fileDir, { recursive: true });
+                console.log(`Created directory: ${fileDir}`);
+            }
 
             if (!fs.existsSync(req.file.path)) {
                 return res.status(400).json({ message: 'File not found after upload' });
@@ -31,10 +35,13 @@ const uploadSchema = async (req,res) => {
             fileContent = fs.readFileSync(req.file.path, 'utf8');
             filename = req.file.originalname;
             
-            // Delete the temporary file
-            fs.unlinkSync(req.file.path);
+            try {
+                fs.unlinkSync(req.file.path);
+                console.log(`Temporary file deleted: ${req.file.path}`);
+            } catch (err) {
+                console.error(`Error deleting temporary file: ${err.message}`);
+            }
         } else if (req.body.content && req.body.filename) {
-            // Direct JSON content from API
             fileContent = req.body.content;
             filename = req.body.filename;
         } else {
@@ -50,6 +57,19 @@ const uploadSchema = async (req,res) => {
 
         if (!isValidSchema(jsonContent)) {
             return res.status(400).json({ message: 'Invalid JSON-schema structure' });
+        }
+
+        const tmpDir = path.join(__dirname, '../tmp');
+        const uploadsDir = path.join(tmpDir, 'uploads');
+        
+        if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+            console.log(`Created directory: ${tmpDir}`);
+        }
+        
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+            console.log(`Created directory: ${uploadsDir}`);
         }
 
         const schemaAnalysis = await schemaAnalyzer.analyzeSchema(jsonContent);

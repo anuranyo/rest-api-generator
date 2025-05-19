@@ -169,11 +169,29 @@ const generateApi = async (req, res) => {
     const archiveDir = path.join(__dirname, '../tmp', 'archives');
     const archivePath = path.join(archiveDir, `api-${timestamp}.zip`);
 
-    fs.mkdirSync(tempDir, { recursive: true });
-    fs.mkdirSync(archiveDir, { recursive: true });
-    fs.mkdirSync(path.join(tempDir, 'models'), { recursive: true });
-    fs.mkdirSync(path.join(tempDir, 'controllers'), { recursive: true });
-    fs.mkdirSync(path.join(tempDir, 'routes'), { recursive: true });
+    if (!fs.existsSync(path.join(__dirname, '../tmp'))) {
+      fs.mkdirSync(path.join(__dirname, '../tmp'), { recursive: true });
+    }
+    
+    if (!fs.existsSync(archiveDir)) {
+      fs.mkdirSync(archiveDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(path.join(tempDir, 'models'))) {
+      fs.mkdirSync(path.join(tempDir, 'models'), { recursive: true });
+    }
+    
+    if (!fs.existsSync(path.join(tempDir, 'controllers'))) {
+      fs.mkdirSync(path.join(tempDir, 'controllers'), { recursive: true });
+    }
+    
+    if (!fs.existsSync(path.join(tempDir, 'routes'))) {
+      fs.mkdirSync(path.join(tempDir, 'routes'), { recursive: true });
+    }
     
     for (const [filePath, content] of Object.entries(generatedFiles)) {
       const fullPath = path.join(tempDir, filePath);
@@ -369,6 +387,19 @@ const previewGeneratedFiles = async (req, res) => {
       });
     }
     
+    const tmpDir = path.join(__dirname, '../tmp');
+    const previewDir = path.join(tmpDir, 'previews');
+    
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+      console.log(`Created directory: ${tmpDir}`);
+    }
+    
+    if (!fs.existsSync(previewDir)) {
+      fs.mkdirSync(previewDir, { recursive: true });
+      console.log(`Created directory: ${previewDir}`);
+    }
+    
     const schema = await SchemaFile.findById(schemaId);
     
     if (!schema) {
@@ -401,6 +432,19 @@ const previewGeneratedFiles = async (req, res) => {
     
     const previewFiles = {};
     
+    const timestamp = Date.now();
+    const previewFolderPath = path.join(previewDir, `preview-${timestamp}`);
+    
+    if (!fs.existsSync(previewFolderPath)) {
+      fs.mkdirSync(previewFolderPath, { recursive: true });
+      
+      fs.mkdirSync(path.join(previewFolderPath, 'models'), { recursive: true });
+      fs.mkdirSync(path.join(previewFolderPath, 'controllers'), { recursive: true });
+      fs.mkdirSync(path.join(previewFolderPath, 'routes'), { recursive: true });
+      
+      console.log(`Created preview directory: ${previewFolderPath}`);
+    }
+    
     if (tables.length > 0) {
       const tableName = tables[0].name;
       previewFiles[`models/${tableName}.js`] = mongoModelGenerator.generateMongooseModel(schemaAnalysis, tableName);
@@ -412,16 +456,35 @@ const previewGeneratedFiles = async (req, res) => {
       tables.map(table => table.name)
     );
     
+    previewFiles['.env'] = mongoModelGenerator.generateEnvFile ? 
+      mongoModelGenerator.generateEnvFile() : 
+      '# MongoDB Configuration\nMONGODB_URI=mongodb://localhost:27017/your-database-name\n\n# Server Configuration\nPORT=5000';
+    
+    previewFiles['package.json'] = mongoModelGenerator.generatePackageJson ? 
+      mongoModelGenerator.generatePackageJson() : 
+      '{\n  "name": "api-project",\n  "version": "1.0.0",\n  "main": "server.js",\n  "scripts": {\n    "start": "node server.js"\n  }\n}';
+    
+    // Опціонально: Очищення тимчасових файлів після генерації
+    /*
+    try {
+      fs.rmSync(previewFolderPath, { recursive: true, force: true });
+      console.log(`Removed temporary preview directory: ${previewFolderPath}`);
+    } catch (cleanupError) {
+      console.error('Error cleaning up preview files:', cleanupError);
+    }
+    */
+    
     return res.status(200).json({
       success: true,
       message: 'Попередній перегляд файлів згенеровано',
-      files: previewFiles
+      files: previewFiles,
+      previewId: timestamp 
     });
   } catch (error) {
     console.error('Помилка генерації попереднього перегляду:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Помилка сервера при генерації попереднього перегляду' 
+      message: 'Помилка сервера при генерації попереднього перегляду: ' + error.message
     });
   }
 };

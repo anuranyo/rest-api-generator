@@ -3,6 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 
 dotenv.config();
 
@@ -85,5 +86,23 @@ if (process.env.NODE_ENV !== 'production') {
     connectDB();
   });
 }
+
+const initializeDirectories = () => {
+  const directories = [
+    path.join(__dirname, 'tmp'),
+    path.join(__dirname, 'tmp/uploads'),
+    path.join(__dirname, 'tmp/archives'),
+    path.join(__dirname, 'tmp/generated')
+  ];
+  
+  directories.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Створено директорію: ${dir}`);
+    }
+  });
+};
+
+initializeDirectories();
 
 module.exports = app;
